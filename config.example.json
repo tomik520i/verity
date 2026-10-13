@@ -21,7 +21,9 @@
     "speed": 1,
     "emotions": {
       "whisper": {
-        "speed": 0.9
+        "speed": 0.95,
+        "speaker_wav": "/path/to/omnivoice/references/verity_whisper.wav",
+        "reference_text": "Přesný přepis šepotané reference."
       },
       "sad": {
         "speed": 0.92
@@ -52,6 +54,7 @@
   },
   "search": {
     "python": "python3",
-    "searxng_url": "http://YOUR-SEARXNG-HOST:PORT"
+    "searxng_url": "http://YOUR-SEARXNG-HOST:PORT",
+    "fallback_path": ""
   }
 }

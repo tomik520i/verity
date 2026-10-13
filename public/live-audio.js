@@ -1,6 +1,6 @@
 // Živý přepis řeči: mikrofon → AudioWorklet → PCM → samostatně dekódovatelné WAV snímky
 // → /api/stt (server ho přepošle na Whisper službu). Navíc hlásí úroveň hlasu (pro animaci),
-// odhad ruchu v místnosti a pauzu v řeči (pro automatické odeslání).
+// a rozšířeno o úroveň hlasu (pro animaci), odhad ruchu v místnosti a detekci pauzy.
 //
 // Proč PCM a ne MediaRecorder: druhý a další kus WebM nemá hlavičky, takže ho nejde
 // přepsat samostatně. Každý snímek tady je kompletní WAV.

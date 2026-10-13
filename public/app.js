@@ -292,6 +292,7 @@ async function converse(content, isEvent = false, extra = {}) {
   busy = false; $('send').disabled = false;
   lastVerityAt = Date.now();
   maybeCompact();
+  if (!controller.signal.aborted) resumeConversation();
 }
 
 // ── paměť: fakta + deník ─────────────────────────────────────────────────────
@@ -383,8 +384,12 @@ $('form').addEventListener('submit', e => {
 // Režimy: ručně (výchozí; zastavení mikrofonu nic neposílá) / samo po pauze (2,2 s ticha
 // po aspoň 0,2 s řeči). Automatika je jeden tah – mikrofon se po odpovědi sám nezapne,
 // takže se do další zprávy nenahraje hlas Verity.
-let mic = null, micFinishing = false, micBase = '', micTimer = null;
+// Konverzační režim: odesílá po pauze A po dohrání celé odpovědi Verity sám znovu zapne
+// mikrofon (až když dozní její hlas – nenahraje ho). Když 15 s nikdo nemluví, mikrofon zavře.
+let mic = null, micFinishing = false, micBase = '', micTimer = null, convWatch = null;
 let autoSend = store.get('autoSend', false);
+let convMode = store.get('conv', false);
+const sendsAuto = () => autoSend || convMode;
 const micSupported = !!(navigator.mediaDevices?.getUserMedia && window.AudioWorkletNode && window.isSecureContext);
 function micState(text, error = false) {
   const el = $('mic-state');
@@ -408,9 +413,10 @@ function micUi(on) {
   face.listening = on;
   if (!on) face.hear = 0;
 }
-async function startMic() {
+const listeningText = () => (convMode ? 'Konverzace – poslouchám, odešlu po pauze' : autoSend ? 'Poslouchám… odešlu po pauze' : 'Poslouchám… (Odeslat nebo znovu mikrofon)');
+async function startMic({ fromConv = false } = {}) {
   if (mic || micFinishing || !awake) return;
-  if (busy || playing) interrupt();   // skočit Verity do řeči
+  if (!fromConv && (busy || playing)) interrupt();   // skočit Verity do řeči
   micState('Zapínám mikrofon…');
   try {
     const { startMicrophone } = await import('./live-audio.js');
@@ -426,7 +432,7 @@ async function startMic() {
         if (v.speaking) lastUserAt = Date.now();
         vadMeter(v);
       },
-      onPause: () => { if (autoSend) finishMic(true); },
+      onPause: () => { if (sendsAuto()) finishMic(true); },
     });
   } catch (e) {
     mic = null;
@@ -435,13 +441,34 @@ async function startMic() {
   }
   micBase = $('msg').value.trim();
   micUi(true);
-  micState(autoSend ? 'Poslouchám… odešlu po pauze' : 'Poslouchám… (Odeslat nebo znovu mikrofon)');
-  micTimer = setTimeout(() => finishMic(autoSend), 90000);   // nejdéle 90 s
+  micState(listeningText());
+  micTimer = setTimeout(() => finishMic(sendsAuto()), 90000);   // nejdéle 90 s
+  if (fromConv) {
+    // nikdo nemluví → po 15 s zavřít, ať mikrofon neposlouchá donekonečna
+    convWatch = setInterval(() => {
+      if (mic && mic.engine.elapsed > 15 && mic.engine.speechSeconds < 0.3) {
+        cancelMic('Konverzace čeká – klikni na mikrofon, až budeš chtít mluvit.');
+      }
+    }, 500);
+  }
+}
+async function cancelMic(message = '') {
+  if (!mic) return;
+  const m = mic; mic = null;
+  clearTimeout(micTimer); clearInterval(convWatch);
+  micUi(false);
+  micState(message);
+  await m.cancel().catch(() => {});
+}
+// po dohrání odpovědi v konverzačním režimu rovnou poslouchat
+function resumeConversation() {
+  if (!convMode || !micSupported || !awake || document.hidden) return;
+  setTimeout(() => { if (!busy && !playing && !mic && !micFinishing) startMic({ fromConv: true }); }, 400);
 }
 async function finishMic(send) {
   if (!mic) return;
   const m = mic; mic = null; micFinishing = true;
-  clearTimeout(micTimer);
+  clearTimeout(micTimer); clearInterval(convWatch);
   micUi(false);
   micState('Dokončuji přepis…');
   let text = '', failed = false;
@@ -461,7 +488,13 @@ $('mic').onclick = () => (mic ? finishMic(false) : startMic());
 $('opt-auto').checked = autoSend;
 $('opt-auto').onchange = e => {
   autoSend = e.target.checked; store.set('autoSend', autoSend);
-  if (mic) micState(autoSend ? 'Poslouchám… odešlu po pauze' : 'Poslouchám… (Odeslat nebo znovu mikrofon)');
+  if (mic) micState(listeningText());
+};
+$('opt-conv').checked = convMode;
+$('opt-conv').onchange = e => {
+  convMode = e.target.checked; store.set('conv', convMode);
+  if (mic) micState(listeningText());
+  else if (convMode && !busy && !playing) startMic();   // zapnutím rovnou začít poslouchat
 };
 
 // ── vnímání: kurzor, psaní, nečinnost, odchod ze záložky ─────────────────────

@@ -5,7 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
-const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT } = require('./prompt');
+const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT, detectCrisis, detectSearch, detectCalc } = require('./prompt');
 
 const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, fs.existsSync(path.join(__dirname, 'config.json')) ? 'config.json' : 'config.example.json'), 'utf8'));
 // Klíč k interní Whisper službě je v samostatném souboru (chmod 600), ne v config.json.
@@ -116,15 +116,20 @@ function makeTagFilter(emit, onSearch) {
 function runSearch(query) {
   return new Promise(resolve => {
     execFile(SEARCH_PY, ['-I', path.join(__dirname, 'search.py'), query],
-      { timeout: 30000, maxBuffer: 1 << 20, env: { ...process.env, SEARXNG_URL: CFG.search?.searxng_url || '' } }, (err, out) => {
+      { timeout: 30000, maxBuffer: 1 << 20,
+        env: { ...process.env, SEARXNG_URL: CFG.search?.searxng_url || '', SEARCH_FALLBACK_PATH: CFG.search?.fallback_path || '' } },
+      (err, out) => {
         if (err) return resolve({ query, results: [], error: String(err.message).slice(0, 200) });
         try { resolve(JSON.parse(out)); } catch { resolve({ query, results: [], error: 'bad output' }); }
       });
   });
 }
 function formatResults(s) {
-  if (!s.results?.length) return `Hledání „${s.query}“ nic nenašlo${s.error ? ' (chyba sítě)' : ''}.`;
-  return s.results.map((r, i) => `(${i + 1}) ${r.title}\n${r.url}\n${(r.text || '').slice(0, 1500)}`).join('\n\n');
+  if (!s.results?.length && !s.answers?.length) return `Hledání „${s.query}“ nic nenašlo${s.error ? ' (chyba sítě)' : ''}.`;
+  const answers = (s.answers || []).map(a => '[rychlá odpověď] ' + a).join('\n');
+  const results = (s.results || []).map((r, i) => `(${i + 1}) ${r.title}${r.date ? ' [' + r.date + ']' : ''}\n${r.url}\n` +
+    `Úryvek: ${r.snippet || '-'}${r.text ? '\nZe stránky: ' + r.text.slice(0, 1500) : ''}`).join('\n\n');
+  return [answers, results].filter(Boolean).join('\n\n');
 }
 
 async function handleChat(req, res) {
@@ -148,6 +153,10 @@ async function handleChat(req, res) {
     interrupted: st.interrupted === true,
     viaVoice: st.viaVoice === true,
     ambience: ['ticho', 'mírný ruch', 'hluk'].includes(st.ambience) ? st.ambience : null,
+    // pojistka: krizová slova v poslední zprávě → výrazné upozornění v KONTEXTU
+    crisis: detectCrisis ? detectCrisis(history[history.length - 1].content) : false,
+    // kalkulačka: příklad s čísly spočítá server, model dostane hotový výsledek
+    calc: detectCalc ? detectCalc(history[history.length - 1].content) : null,
     device: describeDevice(req.headers['user-agent']),
     gpu: gpu ? `${gpu.temp} °C, vytížení ${gpu.util} %, paměť ${Math.round(gpu.mem / 1024)} z ${Math.round(gpu.total / 1024)} GB` : null,
   };
@@ -165,6 +174,19 @@ async function handleChat(req, res) {
   req.on('close', () => { if (!res.writableEnded) controller.abort(); });
 
   try {
+    // Router: zjevný dotaz na aktuální informace → vyhledat ještě před odpovědí (model by si jinak
+    // počasí nebo výsledky občas vymyslel). Model pak dostane výsledky přímo k poslední zprávě.
+    const routed = detectSearch ? detectSearch(last.content) : null;
+    if (routed) {
+      send({ search: routed });
+      const result = await runSearch(routed);
+      send({ sources: (result.results || []).slice(0, 3).map(r => ({ title: r.title, url: r.url })) });
+      messages[messages.length - 1].content += `
+
+[[VÝSLEDKY HLEDÁNÍ „${routed}“ – vidíš je jen ty. Dnes je ${new Date().toLocaleDateString('cs-CZ')}, ` +
+        `ignoruj zastaralé údaje.]]
+${formatResults(result)}`;
+    }
     let spoken = '', query = null;
     const filter = makeTagFilter(t => { spoken += t; send({ t }); }, q => { query = q; controller.abort(); });
     await streamLLM(messages, t => filter.feed(t), controller);
@@ -261,16 +283,20 @@ async function handleTts(req, res) {
   const t = CFG.tts;
   const emo = EMOTIONS.includes(body.emotion) ? body.emotion : 'neutral';
   const over = t.emotions[emo] || {};
-  const cloning = t.mode === 'clone' && t.speaker_wav && fs.existsSync(t.speaker_wav);
+  // Emoce může mít vlastní referenci (např. šepot klonovaný ze šepotané nahrávky – design režim
+  // OmniVoice je trénovaný jen na čínštině a angličtině, česky šepot nespolehlivě šumí).
+  const refWav = over.speaker_wav && fs.existsSync(over.speaker_wav) ? over.speaker_wav : t.speaker_wav;
+  const refText = refWav === over.speaker_wav ? (over.reference_text || '') : (t.reference_text || '');
+  const cloning = t.mode === 'clone' && refWav && fs.existsSync(refWav);
   const settings = {
     voice_mode: cloning ? 'clone' : 'design',
     language: t.language, num_step: t.num_step, seed: t.seed, normalize_text: true,
     speed: Math.max(0.5, Math.min(2, (over.speed || 1) * (t.speed || 1))),
   };
-  if (cloning) settings.reference_text = t.reference_text || '';
+  if (cloning) settings.reference_text = refText;
   else settings.instruct = [t.instruct, over.instruct_extra].filter(Boolean).join(', ');
   const payload = { text, settings, streamer: 'verity', queue_timeout: 60 };
-  if (cloning) payload.speaker_wav = t.speaker_wav;
+  if (cloning) payload.speaker_wav = refWav;
 
   try {
     let wav;
@@ -290,6 +316,28 @@ async function handleTts(req, res) {
   } catch (e) {
     json(res, 502, { error: 'TTS nedostupné: ' + e.message });
   }
+}
+
+// Whisper si při šumu/tichu „vymýšlí“ fráze z titulků, na kterých se učil
+// („Titulky vytvořil JohnyX“, „Děkujeme za pozornost“…). Ty se z přepisu odstraní;
+// samotné „Děkuji.“ / „Konec.“ bez dalšího textu se zahodí celé.
+const HALLUCINATIONS = [
+  /titulky (vytvořil|vytvořila|připravil|přeložil|:)[^.!?]*[.!?]?/gi,
+  /(překlad|korektura|titulky)\s*:\s*[^.!?]*[.!?]?/gi,
+  /(děkuj(eme|i) za (pozornost|sledování|zhlédnutí)|díky za (pozornost|sledování))[.!?]?/gi,
+  /(odebírejte|sledujte nás|nezapomeňte (dát like|odebírat))[^.!?]*[.!?]?/gi,
+  /www\.[a-z0-9-]+\.(cz|sk|com)\S*/gi,
+  /(amara\.org|johnyx|hradeckesluzby)[^.!?]*[.!?]?/gi,
+];
+const LONE = /^(konec|děkuji|děkujeme|titulky|hudba|\[hudba\]|♪+|\.+|…)[.!?…]*$/i;
+function cleanTranscript(text) {
+  let t = String(text || '');
+  for (const re of HALLUCINATIONS) t = t.replace(re, ' ');
+  // osamocené „Konec.“ / „Děkujeme.“ jako samostatné věty na začátku nebo konci
+  const sentences = t.replace(/\s+/g, ' ').match(/[^.!?…]+[.!?…]*/g) || [];
+  while (sentences.length && LONE.test(sentences[0].trim())) sentences.shift();
+  while (sentences.length && LONE.test(sentences[sentences.length - 1].trim())) sentences.pop();
+  return sentences.join('').replace(/^[\s.,!?…-]+/, '').trim();
 }
 
 // ── STT: proxy na Whisper službu (config.stt.url) ─────────────────────────────
@@ -318,7 +366,7 @@ async function handleStt(req, res) {
     let peak = 0; for (let i = 0; i + 1 < pcm.length; i += 2) peak = Math.max(peak, Math.abs(pcm.readInt16LE(i)));
     console.log(`[stt] ${q.get('final') === '1' ? 'final' : 'live '} ${(d.duration ?? 0).toFixed?.(1) ?? d.duration}s ` +
       `peak ${(20 * Math.log10(peak / 32768 + 1e-9)).toFixed(0)} dBFS → ${r.status} ${String(d.text || '').length} znaků`);
-    json(res, r.status, r.ok ? { text: String(d.text || ''), duration: d.duration } : { error: d.error || d.detail || 'Přepis selhal.' });
+    json(res, r.status, r.ok ? { text: cleanTranscript(d.text), duration: d.duration } : { error: d.error || d.detail || 'Přepis selhal.' });
   } catch {
     json(res, 503, { error: 'Přepis hlasu je právě nedostupný. Můžeš napsat zprávu.' });
   }
