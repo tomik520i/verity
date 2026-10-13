@@ -70,13 +70,37 @@
     <span class="vad-label" id="vad-label">ticho</span>
   </div>
   <div class="mic-state" id="mic-state" hidden aria-live="polite"></div>
+  <div class="attach" id="attach" hidden>
+    <img id="attach-img" alt="Připravená fotka">
+    <span>fotka pro Verity</span>
+    <button type="button" class="icon" id="attach-x" aria-label="Zrušit fotku">×</button>
+  </div>
   <form class="input" id="form" autocomplete="off">
+    <button type="button" id="cam" class="tool" aria-label="Vyfotit" title="Vyfotit (telefon: foťák, počítač: webkamera)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke-width="2"/></svg>
+    </button>
+    <button type="button" id="pic" class="tool" aria-label="Poslat obrázek" title="Poslat obrázek z galerie / ze souboru (na PC i Ctrl+V nebo přetažením)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke-width="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4" fill="none" stroke-width="2" stroke-linejoin="round"/></svg>
+    </button>
+    <input type="file" id="pic-file" accept="image/*" hidden>
+    <input type="file" id="cam-file" accept="image/*" capture="environment" hidden>
     <input id="msg" maxlength="1000" placeholder="Napiš mi něco…" aria-label="Zpráva pro Verity">
     <button type="button" id="mic" class="mic" aria-label="Mluvit" aria-pressed="false" title="Mluvit (zvuk se během nahrávání přepisuje na serveru)" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
     <button type="submit" id="send" aria-label="Odeslat">➤</button>
   </form>
+
+  <div class="webcam" id="webcam" hidden>
+    <div class="webcam-box">
+      <video id="webcam-video" playsinline muted></video>
+      <div class="webcam-actions">
+        <button type="button" id="webcam-flip" class="plain">Přepnout kameru</button>
+        <button type="button" id="webcam-shot" class="shot">Vyfotit</button>
+        <button type="button" id="webcam-cancel" class="plain">Zrušit</button>
+      </div>
+    </div>
+  </div>
 
   <div class="wake" id="wake">
     <div class="wake-inner">

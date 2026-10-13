@@ -131,6 +131,22 @@ body.noflash .scan { animation: none; }
 .input input:focus { border-color: rgba(255,210,31,.5); box-shadow: 0 0 0 3px rgba(255,210,31,.08); }
 .input button { width: 48px; border: 0; border-radius: 12px; background: var(--accent); color: #1a1200; font-size: 18px; cursor: pointer; }
 .input button:disabled { opacity: .35; cursor: default; }
+.input .tool { width: 44px; flex: 0 0 44px; background: #17161a; border: 1px solid #2c2a30; color: var(--fg); display: grid; place-items: center; border-radius: 12px; cursor: pointer; }
+.input .tool svg { width: 20px; height: 20px; fill: currentColor; stroke: currentColor; }
+.input .tool:hover { border-color: rgba(255,210,31,.4); }
+.attach { display: flex; align-items: center; gap: 10px; width: min(720px, 100%); margin: 0 auto; padding: 6px 20px 0; font-size: 12px; color: var(--muted); }
+.attach[hidden] { display: none; }
+.attach img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.msg .thumb { display: block; margin-top: 6px; max-width: 140px; max-height: 140px; border-radius: 8px; border: 1px solid #2a2930; }
+body.dropping::after { content: "Pusť fotku sem – Verity se podívá"; position: fixed; inset: 12px; z-index: 30; border: 2px dashed var(--accent); border-radius: 16px; display: grid; place-items: center; color: var(--accent); background: rgba(5,5,7,.8); font-size: 18px; letter-spacing: .05em; }
+.webcam { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.85); display: grid; place-items: center; padding: 16px; }
+.webcam[hidden] { display: none; }
+.webcam-box { width: min(720px, 100%); display: grid; gap: 12px; }
+.webcam video { width: 100%; max-height: 70vh; border-radius: 14px; background: #000; border: 1px solid var(--line); transform: scaleX(-1); }
+.webcam-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.webcam-actions button { border-radius: 10px; padding: 10px 16px; font: inherit; cursor: pointer; border: 1px solid #2c2a30; background: #17161a; color: var(--fg); }
+.webcam-actions .shot { background: var(--accent); color: #1a1200; border: 0; font-weight: 700; padding: 10px 26px; }
+@media (max-width: 560px) { .input .tool { width: 40px; flex-basis: 40px; } .input { gap: 6px; } }
 .input .mic { background: #17161a; border: 1px solid #2c2a30; color: var(--fg); display: grid; place-items: center; }
 .input .mic[hidden] { display: none; }
 .input .mic svg { width: 20px; height: 20px; fill: currentColor; stroke: currentColor; }

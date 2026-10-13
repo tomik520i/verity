@@ -133,7 +133,10 @@ function formatResults(s) {
 }
 
 async function handleChat(req, res) {
-  const body = await readBody(req, 2 * 1024 * 1024);
+  const body = await readBody(req, 10 * 1024 * 1024);
+  // Fotka k poslední zprávě (vision): jen JPEG/PNG/WebP jako data URL, max ~6 MB.
+  const image = typeof body.image === 'string' && body.image.length < 8e6 &&
+    /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(body.image) ? body.image : null;
   const history = (Array.isArray(body.messages) ? body.messages : [])
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-CFG.llm.history_limit)
@@ -186,6 +189,11 @@ async function handleChat(req, res) {
 [[VÝSLEDKY HLEDÁNÍ „${routed}“ – vidíš je jen ty. Dnes je ${new Date().toLocaleDateString('cs-CZ')}, ` +
         `ignoruj zastaralé údaje.]]
 ${formatResults(result)}`;
+    }
+    // fotka: poslední zpráva jako text + obrázek (OpenAI formát, llama.cpp s mmproj)
+    if (image) {
+      const m = messages[messages.length - 1];
+      m.content = [{ type: 'text', text: m.content }, { type: 'image_url', image_url: { url: image } }];
     }
     let spoken = '', query = null;
     const filter = makeTagFilter(t => { spoken += t; send({ t }); }, q => { query = q; controller.abort(); });

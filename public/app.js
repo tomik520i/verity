@@ -1,4 +1,5 @@
 import { Face } from './face.js';
+import { setupPhoto } from './photo.js';
 
 const EMOTIONS = ['neutral', 'happy', 'excited', 'curious', 'love', 'shy', 'sad',
   'lonely', 'scared', 'jealous', 'angry', 'unhinged', 'whisper'];
@@ -243,10 +244,11 @@ function makeParser(onSegment, onShift, onFact) {
 }
 
 // ── log ──────────────────────────────────────────────────────────────────────
-function addLog(kind, text) {
+function addLog(kind, text, thumb = null) {
   const el = document.createElement('div');
   el.className = 'msg ' + kind;
-  el.appendChild(document.createTextNode(text));
+  el.appendChild(document.createTextNode(text.replace(/\s*\[\[FOTKA\]\]/g, '')));
+  if (thumb) { const img = document.createElement('img'); img.className = 'thumb'; img.src = thumb; img.alt = 'fotka'; el.appendChild(img); }
   $('log').appendChild(el);
   scrollLog();
   return el;
@@ -276,12 +278,14 @@ function interrupt() {
   if (bubble) bubble.firstChild.textContent += ' —';
 }
 
-async function converse(content, isEvent = false, extra = {}) {
+async function converse(content, isEvent = false, extra = {}, photo = null) {
   if (busy) return;
   busy = true; $('send').disabled = true;
-  history.push({ role: 'user', content, at: Date.now() });
+  // fotka: plná velikost jde jen s touto zprávou; do historie jen značka [[FOTKA]] a miniatura
+  if (photo) content += ' [[FOTKA]]';
+  history.push({ role: 'user', content, at: Date.now(), ...(photo ? { thumb: photo.thumb } : {}) });
   saveHistory();
-  if (!isEvent) addLog('user', content);
+  if (!isEvent) addLog('user', content, photo?.thumb);
   face.thinking = true;
   bubble = null; spokenSoFar = [];
   let raw = '', sources = null;
@@ -294,6 +298,7 @@ async function converse(content, isEvent = false, extra = {}) {
         messages: history.slice(memory.windowStart).map(({ role, content }) => ({ role, content })),
         memory: { facts: memory.facts, diary: memory.diary.map(d => d.text) },
         state: buildState({ ...extra, interrupted: interruptedBefore }),
+        ...(photo ? { image: photo.image } : {}),
       }) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const reader = r.body.getReader(), dec = new TextDecoder();
@@ -412,12 +417,28 @@ $('mem-file').onchange = async e => {
 };
 
 function sendText(text, voice = null) {
-  if (!text || busy || !awake) return false;
+  if ((!text && !pendingPhoto) || busy || !awake) return false;
+  const photo = pendingPhoto; clearPhoto();
   $('msg').value = '';
   lastUserAt = Date.now(); idleCount = 0;
-  converse(text, false, voice ? { viaVoice: true, ambience: voice.ambience } : {});
+  converse(text || 'Podívej, posílám ti fotku.', false, voice ? { viaVoice: true, ambience: voice.ambience } : {}, photo);
   return true;
 }
+
+// ── fotky (vision) ───────────────────────────────────────────────────────────
+let pendingPhoto = null;
+function clearPhoto() { pendingPhoto = null; $('attach').hidden = true; $('attach-img').removeAttribute('src'); }
+$('attach-x').onclick = clearPhoto;
+setupPhoto({
+  onPhoto: p => {
+    pendingPhoto = p;
+    $('attach-img').src = p.thumb; $('attach').hidden = false;
+    if (!busy && !playing) face.setEmotion('curious');          // zvědavě kouká, co jí neseš
+    micState('Fotka připravená – připiš zprávu nebo rovnou odešli.');
+    $('msg').focus();
+  },
+  onError: m => micState(m, true),
+});
 $('form').addEventListener('submit', e => {
   e.preventDefault();
   if (mic) { finishMic(true); return; }     // Odeslat během nahrávání: dokončit přepis a pak poslat
@@ -648,7 +669,7 @@ $('opt-reset').onclick = () => {
 
 // ── probuzení ────────────────────────────────────────────────────────────────
 history.filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-300)
-  .forEach(m => addLog(m.role === 'user' ? 'user' : 'verity', m.role === 'user' ? m.content : stripTags(m.content)));
+  .forEach(m => addLog(m.role === 'user' ? 'user' : 'verity', m.role === 'user' ? m.content : stripTags(m.content), m.thumb));
 
 $('wake-btn').onclick = async () => {
   await initAudio();
