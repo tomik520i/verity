@@ -59,6 +59,12 @@ body {
 .menu[hidden] { display: none; }
 .menu button { background: #2a0b0b; color: #ff8080; border: 1px solid #522; border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
 
+.music-btn { font-size: 18px; transition: color .2s, text-shadow .2s; }
+.music-btn.on { color: var(--accent); text-shadow: 0 0 10px var(--accent); animation: pulse 0.9s infinite; }
+.music-box { display: grid; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #222; }
+.music-title { color: var(--muted); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; }
+.music-vol { display: flex; align-items: center; gap: 8px; }
+.music-vol input { flex: 1; accent-color: var(--accent); }
 .menu button.plain, .mem-actions button { background: #17161a; color: var(--fg); border-color: #2c2a30; }
 
 /* ── panel paměti ──────────────────────────── */

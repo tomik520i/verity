@@ -38,6 +38,8 @@ export class Face {
     this.searching = false;
     this.listening = false; // nahrává se mikrofon
     this.hear = 0;          // 0..1 hlasitost uživatele
+    this.dance = 0;         // 0..1 hraje hudba (podkres) → tančí
+    this.beat = 0;          // 0..1 úder v hudbě (1 = právě teď)
     this.talk = 0;        // 0..1 hlasitost z lip syncu
     this.round = 0;       // 0..1 „kulatost“ samohlásky (o/u)
     this.look = { x: 0, y: 0 };
@@ -100,6 +102,10 @@ export class Face {
     t.teeth = Math.max(t.teeth, clamp((this.instability - 70) / 30, 0, 1));
     t.shake += clamp((this.instability - 60) / 40, 0, 1) * 0.8;
     if (this.thinking) { t.lookX = Math.sin(now / 700) * 6; t.lookY = -7; t.w *= 0.6; t.curve *= 0.6; t.open = 0; }
+    if (this.dance > 0.05) {
+      // při hudbě se usmívá víc a na úder přimhouří oči
+      t.curve += 10 * this.dance; t.w += 6 * this.dance; t.ery -= this.beat * 7 * this.dance; t.glow += 0.2 * this.dance;
+    }
     if (this.listening) {
       // naklání se k uživateli, oči dokořán, pozorně zírá; při hlasu se rozzáří
       t.scale *= 1.06 + this.hear * 0.03; t.ery += 4; t.lookX = this.look.x * 2; t.lookY = 2;
@@ -130,11 +136,16 @@ export class Face {
     const jx = (Math.random() - 0.5) * shake, jy = (Math.random() - 0.5) * shake;
     const bob = Math.sin(now / 900) * 7 * p.bob;
     this.pop = Math.max(0, this.pop - dt * 3);
-    const squash = 1 + Math.sin(this.pop * Math.PI) * 0.06;
-    const breathe = 1 + Math.sin(now / 1600) * 0.012 + this.talk * 0.02;
+    // tanec na podkres: na úder vyskočí a natáhne se, při dopadu se zplácne; mezi údery se pohupuje do stran
+    const dn = this.dance, b = this.beat;
+    const hop = -b * 26 * dn;
+    const stretch = 1 + (b > 0.6 ? (b - 0.6) * 0.18 : -(0.6 - b) * 0.05 * (b > 0.05 ? 1 : 0)) * dn;
+    const sway = Math.sin(now / 320) * 7 * dn;
+    const squash = (1 + Math.sin(this.pop * Math.PI) * 0.06) / stretch;
+    const breathe = 1 + Math.sin(now / 1600) * 0.012 + this.talk * 0.02 + b * 0.04 * dn;
     const s = p.scale * breathe;
     this.rig.setAttribute('transform',
-      `translate(${200 + jx} ${200 + bob + jy}) rotate(${p.tilt + Math.sin(now / 2300) * 2}) scale(${s * squash} ${s / squash}) translate(-200 -200)`);
+      `translate(${200 + jx + Math.sin(now / 640) * 6 * dn} ${200 + bob * (1 - dn) + jy + hop}) rotate(${p.tilt + Math.sin(now / 2300) * 2 + sway}) scale(${s * squash} ${s / squash}) translate(-200 -200)`);
 
     // barvy těla: žlutá → tmavě oranžová/rudá
     const dark = clamp(p.red * 0.7 + p.dim, 0, 1);
@@ -142,7 +153,7 @@ export class Face {
     this.stops.forEach((st, i) => st.setAttribute('stop-color', mix(pal[i][0], pal[i][1], dark)));
     const glowCol = mix('#ffcf1f', '#ff1e1e', p.red);
     this.host.style.setProperty('--glow', glowCol);
-    this.host.style.setProperty('--glow-size', (24 + 40 * p.glow + this.talk * 30 + this.hear * 30).toFixed(0) + 'px');
+    this.host.style.setProperty('--glow-size', (24 + 40 * p.glow + this.talk * 30 + this.hear * 30 + this.beat * 45 * this.dance).toFixed(0) + 'px');
     document.documentElement.style.setProperty('--emo-glow', glowCol);
 
     // oči

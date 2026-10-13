@@ -16,7 +16,7 @@ const PUBLIC = path.join(__dirname, 'public');
 const SEARCH_PY = CFG.search?.python || 'python3';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
-  '.ico': 'image/x-icon', '.wav': 'audio/wav', '.json': 'application/json', '.md': 'text/plain; charset=utf-8' };
+  '.ico': 'image/x-icon', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.json': 'application/json', '.md': 'text/plain; charset=utf-8' };
 
 // ── GPU „tělo“ ───────────────────────────────────────────────────────────────
 let gpu = null;

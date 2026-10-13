@@ -83,6 +83,66 @@ function lipLoop(now) {
 }
 requestAnimationFrame(lipLoop);
 
+// ── podkres (hudba) + tanec do rytmu ─────────────────────────────────────────
+// <audio> → MediaElementSource → Analyser (detekce úderů z basů) → Gain (hlasitost, ztlumení
+// když Verity mluví) → reproduktory. Na úder smajlík vyskočí (face.beat), dokud hraje, tančí (face.dance).
+const music = { el: null, gain: null, analyser: null, data: null, avg: 0, lastBeat: 0, playing: false };
+let musicVol = store.get('musicVol', 0.5), musicLoop = store.get('musicLoop', true);
+function initMusic() {
+  if (music.el || !actx) return;
+  const el = new Audio('podkres.mp3');
+  el.loop = musicLoop; el.preload = 'auto';
+  const src = actx.createMediaElementSource(el);
+  music.analyser = actx.createAnalyser(); music.analyser.fftSize = 1024; music.analyser.smoothingTimeConstant = 0.5;
+  music.gain = actx.createGain(); music.gain.gain.value = musicVol;
+  src.connect(music.analyser); music.analyser.connect(music.gain); music.gain.connect(actx.destination);
+  music.data = new Uint8Array(music.analyser.frequencyBinCount);
+  el.onplay = () => { music.playing = true; musicUi(); };
+  el.onpause = el.onended = () => { music.playing = false; musicUi(); };
+  music.el = el; music.idx = 0; music.lastT = 0;
+  fetch('podkres.beats.json').then(r => (r.ok ? r.json() : null)).then(d => { music.beats = d?.beats || null; }).catch(() => {});
+}
+async function toggleMusic(on = !music.playing) {
+  if (!actx) return;                       // až po probuzení (prohlížeč pustí zvuk jen po kliknutí)
+  initMusic();
+  if (on) { try { await actx.resume(); await music.el.play(); } catch (e) { console.warn('podkres:', e.message); } }
+  else music.el.pause();
+  store.set('music', on);
+}
+function musicUi() {
+  $('music-btn').classList.toggle('on', music.playing);
+  $('music-play').textContent = music.playing ? '❚❚ Zastavit' : '▶ Pustit';
+}
+function musicFrame(now) {
+  requestAnimationFrame(musicFrame);
+  face.dance += ((music.playing ? 1 : 0) - face.dance) * 0.05;
+  if (!music.playing || !music.analyser) { face.beat *= 0.85; return; }
+  if (music.beats) {
+    // přesná časová osa úderů spočítaná předem (librosa beat tracking → podkres.beats.json)
+    const t = music.el.currentTime;
+    if (t < music.lastT - 0.5) music.idx = 0;                     // nové kolo smyčky
+    music.lastT = t;
+    while (music.idx < music.beats.length && music.beats[music.idx][0] < t - 0.25) music.idx++;   // přeskočené
+    if (music.idx < music.beats.length && t >= music.beats[music.idx][0]) {
+      face.beat = 0.55 + 0.45 * music.beats[music.idx][1];
+      music.idx++;
+    } else face.beat *= 0.86;
+  } else {
+    // záloha bez časové osy: úder = basy výrazně nad klouzavým průměrem (min. 230 ms od posledního)
+    music.analyser.getByteFrequencyData(music.data);
+    const hz = actx.sampleRate / music.analyser.fftSize, top = Math.max(2, Math.floor(160 / hz));
+    let bass = 0; for (let i = 1; i <= top; i++) bass += music.data[i];
+    bass /= top;
+    music.avg = music.avg * 0.95 + bass * 0.05;
+    if (bass > music.avg * 1.25 && bass > 60 && now - music.lastBeat > 230) { face.beat = 1; music.lastBeat = now; }
+    else face.beat = Math.max(face.beat * 0.88, Math.pow(bass / 255, 2) * 0.35);
+  }
+  // když Verity mluví, hudba se ztlumí na 30 %
+  const target = musicVol * (current ? 0.3 : 1);
+  music.gain.gain.value += (target - music.gain.gain.value) * 0.08;
+}
+requestAnimationFrame(musicFrame);
+
 async function fetchTts(text, emotion) {
   if (!voiceOn || !ttsOk || !actx) return null;
   const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, emotion }) });
@@ -571,6 +631,13 @@ setInterval(pollStatus, 10000);
 
 // ── menu ─────────────────────────────────────────────────────────────────────
 $('menu-btn').onclick = () => { $('menu').hidden = !$('menu').hidden; };
+// podkres: ♪ v liště + hlasitost / opakování v menu
+$('music-btn').onclick = () => toggleMusic();
+$('music-play').onclick = () => toggleMusic();
+$('music-vol').value = musicVol;
+$('music-vol').oninput = e => { musicVol = +e.target.value; store.set('musicVol', musicVol); };
+$('music-loop').checked = musicLoop;
+$('music-loop').onchange = e => { musicLoop = e.target.checked; store.set('musicLoop', musicLoop); if (music.el) music.el.loop = musicLoop; };
 $('opt-voice').checked = voiceOn;
 $('opt-voice').onchange = e => { voiceOn = e.target.checked; store.set('voice', voiceOn); pollStatus(); };
 $('opt-meter').checked = store.get('meter', false);
@@ -588,6 +655,7 @@ history.filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-300)
 
 $('wake-btn').onclick = async () => {
   await initAudio();
+  if (store.get('music', false)) toggleMusic(true);   // podkres hrál i minule → pokračovat
   awake = true;
   visits++; store.set('visits', visits);
   $('wake').classList.add('gone');

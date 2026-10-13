@@ -19,9 +19,16 @@
       <span class="pill" id="st-tts"><i></i><b>HLAS</b></span>
       <span class="pill" id="st-stt" hidden><i></i><b>SLUCH</b></span>
       <span class="gpu" id="st-gpu"></span>
+      <button class="icon music-btn" id="music-btn" aria-label="Podkres (hudba)" title="Podkres – pustit / zastavit">♪</button>
       <button class="icon" id="menu-btn" aria-label="Nastavení">⋮</button>
     </div>
     <div class="menu" id="menu" hidden>
+      <div class="music-box">
+        <span class="music-title">Podkres</span>
+        <button id="music-play" class="plain">▶ Pustit</button>
+        <label class="music-vol">Hlasitost <input type="range" id="music-vol" min="0" max="1" step="0.01"></label>
+        <label><input type="checkbox" id="music-loop"> Opakovat dokola</label>
+      </div>
       <label><input type="checkbox" id="opt-voice" checked> Hlas</label>
       <label title="Po 2,2 s ticha se mluvená zpráva odešle sama"><input type="checkbox" id="opt-auto"> Mluvení: odeslat samo po pauze</label>
       <label title="Po dohrání odpovědi se mikrofon zapne sám, odesílá se po pauze. Když 15 s nemluvíš, zavře se."><input type="checkbox" id="opt-conv"> Konverzace: po odpovědi hned poslouchat</label>
