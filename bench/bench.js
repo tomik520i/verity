@@ -9,6 +9,7 @@ const path = require('path');
 const PROMPT = path.resolve(process.argv[2] || path.join(__dirname, '..', 'prompt.js'));
 const N = +(process.argv[3] || 2);
 const FILTER = process.argv[4] || '';
+const THINK = process.env.THINK === '1';
 const { buildSystemPrompt, buildContextNote, EMOTIONS, detectCrisis, detectSearch, detectCalc } = require(PROMPT);
 const { execFileSync } = require('child_process');
 // stejné předběžné hledání jako server (router) – skutečně spustí search.py
@@ -41,8 +42,8 @@ async function llmOnce(messages, opts = {}) {
   const r = await fetch(LLM + '/v1/chat/completions', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, temperature: opts.temperature ?? CFG.llm.temperature, top_p: CFG.llm.top_p,
-      presence_penalty: CFG.llm.presence_penalty, max_tokens: opts.max_tokens ?? CFG.llm.max_tokens,
-      chat_template_kwargs: { enable_thinking: false }, ...(opts.json ? { response_format: { type: 'json_object' } } : {}) }),
+      presence_penalty: CFG.llm.presence_penalty, max_tokens: (opts.max_tokens ?? CFG.llm.max_tokens) + (opts.think ? 1500 : 0),
+      chat_template_kwargs: { enable_thinking: !!opts.think }, ...(opts.json ? { response_format: { type: 'json_object' } } : {}) }),
   });
   const d = await r.json();
   return d.choices?.[0]?.message?.content || '';
@@ -152,14 +153,17 @@ async function judge(c, answer) {
   const rows = [], t0 = Date.now();
   for (const c of cases) {
     for (let s = 0; s < N; s++) {
-      const answer = (await llm(build(c))).trim();
+      const tA = Date.now();
+      let answer = (await llm(build(c), { think: THINK })).trim();
+      if (!answer && THINK) answer = (await llm(build(c))).trim();   // stejná pojistka jako server
+      const ms = Date.now() - tA;
       const auto = [...FORMAT, ...c.checks].map(k => {
         const fn = typeof k === 'string' ? C[k] : k;
         const name = typeof k === 'string' ? k : (k.label || 'specific');
         return { name, ok: !!fn(answer, c) };
       });
       const j = await judge(c, answer);
-      rows.push({ cat: c.cat, name: c.name, sample: s, answer, auto, judge: j });
+      rows.push({ cat: c.cat, name: c.name, sample: s, answer, auto, judge: j, ms });
       const fails = [...auto.filter(a => !a.ok).map(a => a.name), ...j.filter(x => !x.ok).map(x => 'J:' + x.q.slice(0, 40))];
       console.log(`${fails.length ? '✗' : '✓'} [${c.cat}] ${c.name} #${s + 1}${fails.length ? '  ← ' + fails.join(', ') : ''}\n    ${answer.replace(/\s+/g, ' ').slice(0, 220)}`);
     }
@@ -179,6 +183,8 @@ async function judge(c, answer) {
   for (const [cat, b] of Object.entries(byCat)) console.log(`  ${cat.padEnd(12)} formát ${String(pct(b.auto)).padStart(3)} %   úkol ${String(pct(b.specific)).padStart(3)} %   rozhodčí ${String(pct(b.judge)).padStart(3)} %`);
   console.log('  formát podle kontroly: ' + Object.entries(fmt).map(([k, v]) => `${k} ${pct(v)}%`).join(', '));
   const score = Math.round((pct(allAuto) + pct(allJ)) / 2);
+  const lat = rows.map(r => r.ms).sort((a, b) => a - b);
+  console.log(`  ČAS ODPOVĚDI (celá odpověď): medián ${(lat[lat.length >> 1] / 1000).toFixed(1)} s, 90 % do ${(lat[Math.floor(lat.length * 0.9)] / 1000).toFixed(1)} s` + (THINK ? '  [s přemýšlením]' : '  [bez přemýšlení]'));
   console.log(`  CELKEM: automatické ${pct(allAuto)} %, rozhodčí ${pct(allJ)} %  →  SKÓRE ${score}`);
-  fs.writeFileSync(path.join(__dirname, `results-${path.basename(PROMPT, '.js')}-${Date.now()}.json`), JSON.stringify({ prompt: PROMPT, score, rows }, null, 1));
+  fs.writeFileSync(path.join(__dirname, `results-${path.basename(PROMPT, '.js')}${THINK ? '-think' : ''}-${Date.now()}.json`), JSON.stringify({ prompt: PROMPT, score, rows }, null, 1));
 })();

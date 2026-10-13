@@ -61,6 +61,8 @@ body.noflash .scan { animation: none; }
 .menu[hidden] { display: none; }
 .menu button { background: #2a0b0b; color: #ff8080; border: 1px solid #522; border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
 
+.think-row { display: grid; gap: 4px; }
+.think-row select { background: #17161a; color: var(--fg); border: 1px solid #2c2a30; border-radius: 6px; padding: 5px 6px; font: inherit; font-size: 12px; }
 .music-btn { font-size: 18px; transition: color .2s, text-shadow .2s; }
 .music-btn.on { color: var(--accent); }
 .music-box { display: grid; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #222; }

@@ -33,6 +33,7 @@ let instability = store.get('inst', 0);
 let visits = store.get('visits', 0);
 const lastSeen = store.get('lastSeen', null);
 let voiceOn = store.get('voice', true);
+let thinkMode = store.get('think', 'auto');
 let ttsOk = false, llmOk = false, sttOk = false;
 let awake = false, busy = false, playing = false;
 let lastUserAt = Date.now(), lastVerityAt = Date.now(), idleCount = 0, tabLeaves = 0, hiddenAt = null;
@@ -299,6 +300,7 @@ async function converse(content, isEvent = false, extra = {}, photo = null) {
         memory: { facts: memory.facts, diary: memory.diary.map(d => d.text) },
         state: buildState({ ...extra, interrupted: interruptedBefore }),
         ...(photo ? { image: photo.image } : {}),
+        thinking: thinkMode,
       }) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const reader = r.body.getReader(), dec = new TextDecoder();
@@ -313,6 +315,10 @@ async function converse(content, isEvent = false, extra = {}, photo = null) {
         let ev; try { ev = JSON.parse(line); } catch { continue; }
         if (ev.t) { raw += ev.t; parser.feed(ev.t); }
         if (ev.search) { face.searching = true; $('search-line').textContent = 'hledá: ' + ev.search; $('search-line').hidden = false; }
+        if ('thinking' in ev) {   // model přemýšlí (reasoning) – jen nenápadný údaj, nic se nečte nahlas
+          if (ev.thinking) { $('search-line').textContent = 'přemýšlí…'; $('search-line').hidden = false; }
+          else if ($('search-line').textContent === 'přemýšlí…') $('search-line').hidden = true;
+        }
         if (ev.sources) { sources = ev.sources; face.searching = false; $('search-line').hidden = true; }
         if (ev.error) throw new Error(ev.error);
       }
@@ -652,6 +658,9 @@ $('music-btn').onclick = () => toggleMusic();
 $('music-play').onclick = () => toggleMusic();
 $('music-vol').value = musicVol;
 $('music-vol').oninput = e => { musicVol = +e.target.value; store.set('musicVol', musicVol); };
+// přemýšlení (reasoning): auto / off / on
+$('opt-think').value = thinkMode;
+$('opt-think').onchange = e => { thinkMode = e.target.value; store.set('think', thinkMode); };
 $('music-dance').checked = danceOn;
 $('music-dance').onchange = e => { danceOn = e.target.checked; store.set('dance', danceOn); };
 $('music-loop').checked = musicLoop;

@@ -57,20 +57,24 @@ function describeDevice(ua = '') {
 
 // ── LLM stream ───────────────────────────────────────────────────────────────
 // Zavolá llama.cpp se streamem, text posílá do onText. Vrací po skončení/abortu.
-async function streamLLM(messages, onText, controller) {
+// Přemýšlení (CFG.llm.thinking): llama.cpp ho posílá zvlášť jako reasoning_content – do řeči
+// se nikdy nedostane, jen se hlásí přes onThinking (UI ukáže „přemýšlí…“). Když model
+// vyčerpá limit jen přemýšlením a nic neřekne, zkusí se to znovu bez přemýšlení.
+async function streamLLM(messages, onText, controller, onThinking = () => {}, think = !!CFG.llm.thinking) {
   const r = await fetch(CFG.llm.url + '/v1/chat/completions', {
     method: 'POST', signal: controller.signal,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       messages, stream: true,
       temperature: CFG.llm.temperature, top_p: CFG.llm.top_p,
-      presence_penalty: CFG.llm.presence_penalty, max_tokens: CFG.llm.max_tokens,
-      chat_template_kwargs: { enable_thinking: false },
+      presence_penalty: CFG.llm.presence_penalty,
+      max_tokens: CFG.llm.max_tokens + (think ? (CFG.llm.thinking_budget || 1500) : 0),
+      chat_template_kwargs: { enable_thinking: think },
     }),
   });
   if (!r.ok) throw new Error('LLM HTTP ' + r.status);
   const decoder = new TextDecoder();
-  let buf = '';
+  let buf = '', said = 0, thought = 0;
   try {
     for await (const chunk of r.body) {
       buf += decoder.decode(chunk, { stream: true });
@@ -79,15 +83,21 @@ async function streamLLM(messages, onText, controller) {
         const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
         if (!line.startsWith('data:')) continue;
         const data = line.slice(5).trim();
-        if (data === '[DONE]') return;
+        if (data === '[DONE]') break;
         try {
-          const t = JSON.parse(data).choices?.[0]?.delta?.content;
-          if (t) onText(t);
+          const delta = JSON.parse(data).choices?.[0]?.delta || {};
+          if (delta.reasoning_content) { if (!thought++) onThinking(true); }
+          if (delta.content) { if (!said++ && thought) onThinking(false); onText(delta.content); }
         } catch { /* neúplný řádek */ }
       }
     }
   } catch (e) {
     if (e.name !== 'AbortError' && !controller.signal.aborted) throw e;
+  }
+  if (think && !said && thought && !controller.signal.aborted) {
+    console.warn('[llm] přemýšlení bez odpovědi → znovu bez přemýšlení');
+    onThinking(false);
+    return streamLLM(messages, onText, controller, onThinking, false);
   }
 }
 
@@ -180,6 +190,13 @@ async function handleChat(req, res) {
     // Router: zjevný dotaz na aktuální informace → vyhledat ještě před odpovědí (model by si jinak
     // počasí nebo výsledky občas vymyslel). Model pak dostane výsledky přímo k poslední zprávě.
     const routed = detectSearch ? detectSearch(last.content) : null;
+    // Přemýšlení (reasoning): benchmark ukázal +2 body kvality za ~14× delší odpověď (1,5 s → 22 s).
+    // Režim „auto“ proto přemýšlí jen tam, kde to stojí za to: fotka, výsledky hledání, výpočet,
+    // delší zpráva nebo prosba o pomoc. Běžné povídání a události zůstávají rychlé.
+    const mode = ['off', 'auto', 'on'].includes(body.thinking) ? body.thinking : (CFG.llm.thinking === true ? 'on' : CFG.llm.thinking || 'auto');
+    const think = mode === 'on' || (mode === 'auto' && !last.content.startsWith('[[') && !ctx.crisis &&
+      (!!image || !!routed || !!ctx.calc || last.content.length > 160 ||
+       /(^|[^\p{L}])(vysvětli|vysvětlit|napiš|napsat|poraď|pomoz|pomoct|proč|jak (to|mám|se dá|funguje)|přelož|spočítej|porovnej|navrhni|shrň|oprav)(?!\p{L})/iu.test(last.content)));
     if (routed) {
       send({ search: routed });
       const result = await runSearch(routed);
@@ -197,7 +214,7 @@ ${formatResults(result)}`;
     }
     let spoken = '', query = null;
     const filter = makeTagFilter(t => { spoken += t; send({ t }); }, q => { query = q; controller.abort(); });
-    await streamLLM(messages, t => filter.feed(t), controller);
+    await streamLLM(messages, t => filter.feed(t), controller, on => send({ thinking: on }), think);
     if (!query) filter.flush();
 
     if (query && !res.destroyed) {
@@ -213,7 +230,7 @@ ${formatResults(result)}`;
           'Teď plynule pokračuj ve své odpovědi – navaž na to, co jsi už řekla, neopakuj to. Začni značkou emoce, na konci [posun:N]. Už nehledej.' },
       ];
       const filter2 = makeTagFilter(t => send({ t }), () => controller.abort());
-      await streamLLM(followUp, t => filter2.feed(t), controller);
+      await streamLLM(followUp, t => filter2.feed(t), controller, on => send({ thinking: on }), think);
       filter2.flush();
     }
     send({ done: true });
