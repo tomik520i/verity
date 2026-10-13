@@ -390,7 +390,18 @@ function micState(text, error = false) {
   const el = $('mic-state');
   el.textContent = text || ''; el.hidden = !text; el.classList.toggle('err', error);
 }
+// Ukazatel detekce řeči: úroveň mikrofonu (−70…−10 dBFS), čárka = práh začátku řeči,
+// šedá oblast = šum pozadí; zelená = VAD právě detekuje řeč (ta se posílá k přepisu).
+const dbToPct = db => Math.max(0, Math.min(100, (db + 70) / 60 * 100));
+function vadMeter(v) {
+  $('vad-fill').style.width = dbToPct(v.db) + '%';
+  $('vad-noise').style.width = dbToPct(v.noiseDb) + '%';
+  $('vad-thr').style.left = dbToPct(v.onDb) + '%';
+  $('vad').classList.toggle('speaking', v.speaking);
+  $('vad-label').textContent = v.speaking ? 'MLUVÍŠ' : 'ticho';
+}
 function micUi(on) {
+  $('vad').hidden = !on;
   $('mic').classList.toggle('rec', on);
   $('mic').setAttribute('aria-pressed', on);
   $('msg').readOnly = on;           // během nahrávání by přepis přepsal ruční úpravy
@@ -410,7 +421,11 @@ async function startMic() {
         if (mic) micState(partial ? 'Poslouchám… (přepis se upřesňuje)' : 'Poslouchám…');
       },
       onState: (m, err) => micState(m, err),
-      onLevel: (level, speech) => { face.hear += (level - face.hear) * 0.4; if (speech) lastUserAt = Date.now(); },
+      onLevel: v => {
+        face.hear += ((v.speaking ? v.level : v.level * 0.3) - face.hear) * 0.4;
+        if (v.speaking) lastUserAt = Date.now();
+        vadMeter(v);
+      },
       onPause: () => { if (autoSend) finishMic(true); },
     });
   } catch (e) {

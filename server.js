@@ -313,6 +313,11 @@ async function handleStt(req, res) {
       headers: { 'Content-Type': 'audio/wav', 'X-STT-Key': CFG.stt.key },
     });
     const d = await r.json().catch(() => ({ error: 'Přepis vrátil nečitelnou odpověď.' }));
+    // diagnostika bez obsahu: délka audia, úroveň signálu, počet znaků přepisu
+    const at = Buffer.concat(chunks).indexOf('data'), pcm = Buffer.concat(chunks).subarray(at + 8);
+    let peak = 0; for (let i = 0; i + 1 < pcm.length; i += 2) peak = Math.max(peak, Math.abs(pcm.readInt16LE(i)));
+    console.log(`[stt] ${q.get('final') === '1' ? 'final' : 'live '} ${(d.duration ?? 0).toFixed?.(1) ?? d.duration}s ` +
+      `peak ${(20 * Math.log10(peak / 32768 + 1e-9)).toFixed(0)} dBFS → ${r.status} ${String(d.text || '').length} znaků`);
     json(res, r.status, r.ok ? { text: String(d.text || ''), duration: d.duration } : { error: d.error || d.detail || 'Přepis selhal.' });
   } catch {
     json(res, 503, { error: 'Přepis hlasu je právě nedostupný. Můžeš napsat zprávu.' });

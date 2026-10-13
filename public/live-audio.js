@@ -16,6 +16,14 @@ export function wav(samples, rate) {
   return new Blob([bytes], { type: 'audio/wav' });
 }
 
+// Zesílí úsek na špičku ~ −3 dBFS (max 30×) ještě ve float – tichý mikrofon by po převodu
+// do 16 bitů měl jen pár bitů rozlišení a Whisper by z něj rozpoznal méně.
+function normalize(samples) {
+  let peak = 0; for (const x of samples) peak = Math.max(peak, Math.abs(x));
+  const gain = peak > 0 ? Math.min(30, 0.7 / peak) : 1;
+  return gain === 1 ? samples : samples.map(x => x * gain);
+}
+
 // Spojí přepisy úseků; u úseků s překryvem odstraní shodná slova na švu (max 12).
 const norm = w => w.toLocaleLowerCase('cs').replace(/[^\p{L}\p{N}]/gu, '');
 export function joinTranscript(items) {
@@ -47,53 +55,92 @@ export class LiveTranscriber {
     endpoint = 'api/stt?live=1', rate = 16000, pauseSeconds = 2.2 } = {}) {
     Object.assign(this, { onText, onState, onLevel, onPause, endpoint, rate, pauseSeconds });
     this.segments = []; this.current = null;
-    this.pre = []; this.preSize = 0;          // ~0,24 s před začátkem řeči, aby se neukrojilo první slovo
+    this.pre = []; this.preSize = 0;          // ~0,35 s před začátkem řeči, aby se neukrojilo první slovo
     this.elapsed = 0; this.lastSpeechAt = 0; this.speechSeconds = 0;
-    this.noise = 0.002;                         // adaptivní odhad okolního šumu (RMS)
-    this.pending = null; this.cancelled = false; this.closed = false; this.paused = false;
+    // VAD v decibelech s hysterezí (viz feed); hodnoty v dBFS
+    this.noiseDb = -60;                         // odhad šumu pozadí (rychle dolů, pomalu nahoru)
+    this.peakDb = -120;                         // nejhlasitější blok – pro hlášku „mikrofon nic nezachytává“
+    this.speaking = false; this.onTime = 0; this.quiet = 0;
+    this.pending = null; this.cancelled = false; this.closed = false; this.paused = false; this.warned = false;
     this.controller = new AbortController();
   }
 
   startTimer() { this.timer = setInterval(() => this.pump().catch(() => {}), 1700); }
 
+  // Detekce řeči (VAD):
+  //  - úroveň bloku v dBFS, šum pozadí se průběžně měří jen mimo řeč;
+  //  - řeč ZAČNE, když je úroveň ≥ 9 dB nad šumem aspoň 0,1 s (min. −64 dBFS);
+  //  - řeč SKONČÍ, když je úroveň < 5 dB nad šumem déle než 0,8 s (hystereze → úsek se neseká
+  //    při každém poklesu hlasitosti uprostřed věty);
+  //  - celý úsek od začátku do konce řeči (+ 0,35 s předtím) je jedna promluva; kratší než
+  //    0,3 s znělé řeči (klik, kašel) se zahodí a vůbec se neposílá.
   feed(samples) {
     if (this.closed || this.cancelled) return;
     const dt = samples.length / this.rate;
     this.elapsed += dt;
     let sum = 0; for (const x of samples) sum += x * x;
-    const rms = Math.sqrt(sum / samples.length);
-    const threshold = Math.max(0.007, Math.min(0.026, this.noise * 3));
-    const speech = rms > threshold;
-    this.onLevel(Math.min(1, rms / (threshold * 4)), speech);
-    if (speech) { this.lastSpeechAt = this.elapsed; this.speechSeconds += dt; this.paused = false; }
-    if (!speech && !this.current) this.noise = this.noise * 0.98 + rms * 0.02;
+    const db = 10 * Math.log10(sum / samples.length + 1e-12);
+    this.peakDb = Math.max(this.peakDb, db);
+    const calibrating = this.elapsed < 0.5;     // prvních 0,5 s jen měří šum místnosti
+    if (!this.speaking) {
+      // šum: rychle dolů, pomalu nahoru (řeč ho tak nevytáhne nahoru)
+      const k = calibrating ? 0.5 : db < this.noiseDb ? 0.3 : 0.02;
+      this.noiseDb = Math.max(-90, Math.min(-25, this.noiseDb + (db - this.noiseDb) * k));
+    }
+    // minimum za poslední ~2 s: řeč má mezi slovy mezery, stálý hluk (ventilátor) ne
+    (this.recent ||= []).push([this.elapsed, db]);
+    while (this.recent[0][0] < this.elapsed - 2) this.recent.shift();
+    if (this.speaking && this.elapsed - this.speechStart > 6) {
+      const floor = Math.min(...this.recent.map(r => r[1]));
+      if (floor > this.noiseDb + 9) { this.noiseDb = floor - 3; }   // šum se zvedl → přeměřit
+    }
+    const onDb = Math.max(this.noiseDb + 9, -64), offDb = Math.max(this.noiseDb + 5, -68);
+    const voiced = db > offDb;
 
-    // pauza po řeči (pro režim „odeslat po pauze“): ≥ 0,2 s řeči a pak pauseSeconds ticha
-    if (!this.paused && this.speechSeconds >= 0.2 && this.elapsed - this.lastSpeechAt >= this.pauseSeconds) {
+    if (!this.speaking) {
+      this.onTime = !calibrating && db > onDb ? this.onTime + dt : 0;
+      if (this.onTime >= 0.1) { this.speaking = true; this.quiet = 0; this.speechStart = this.elapsed; }
+    } else {
+      this.quiet = voiced ? 0 : this.quiet + dt;
+      if (this.quiet >= 0.8) this.speaking = false;
+    }
+    if (this.speaking && voiced) { this.lastSpeechAt = this.elapsed; this.speechSeconds += dt; this.paused = false; }
+    this.onLevel({ db, noiseDb: this.noiseDb, onDb, offDb, speaking: this.speaking,
+      level: Math.max(0, Math.min(1, (db - this.noiseDb) / 30)) });
+
+    if (!this.warned && this.elapsed > 3 && this.peakDb < -75) {
+      this.warned = true;
+      this.onState('Mikrofon nic nezachytává – zkontroluj, jestli je v prohlížeči vybraný ten správný.', true);
+    }
+
+    // pauza po řeči (pro režim „odeslat po pauze“): ≥ 0,3 s řeči a pak pauseSeconds ticha
+    if (!this.paused && !this.speaking && this.speechSeconds >= 0.3 && this.elapsed - this.lastSpeechAt >= this.pauseSeconds) {
       this.paused = true; this.onPause();
     }
 
     if (!this.current) {
-      if (!speech) {
+      if (!this.speaking) {
         this.pre.push(samples); this.preSize += samples.length;
-        while (this.preSize > this.rate * 0.24 && this.pre.length > 1) this.preSize -= this.pre.shift().length;
+        while (this.preSize > this.rate * 0.35 && this.pre.length > 1) this.preSize -= this.pre.shift().length;
         return;
       }
-      this.current = { chunks: [...this.pre], count: this.preSize, silence: 0, text: '', sent: 0, final: false, done: false, overlap: false };
+      this.current = { chunks: [...this.pre], count: this.preSize, voiced: 0, text: '', sent: 0, final: false, done: false, overlap: false };
       this.pre = []; this.preSize = 0;
       this.segments.push(this.current);
     }
     const seg = this.current;
     seg.chunks.push(samples); seg.count += samples.length;
-    seg.silence = speech ? 0 : seg.silence + dt;
-    if (seg.silence >= 0.85) {
-      // úsek je dokončený (to ještě neznamená odeslání zprávy)
-      seg.final = true; this.current = null; this.pump().catch(() => {});
+    if (voiced) seg.voiced += dt;
+    if (!this.speaking) {
+      // konec promluvy podle VAD → odeslat celý úsek k závěrečnému přepisu
+      this.current = null;
+      if (seg.voiced < 0.3 && !seg.text) { this.segments.splice(this.segments.indexOf(seg), 1); return; }
+      seg.final = true; this.pump().catch(() => {});
     } else if (seg.count >= this.rate * 24) {
       // souvislá řeč: rozdělit po 24 s s 0,55 s překryvem
       seg.final = true;
       const tail = this.samples(seg).slice(-Math.floor(this.rate * 0.55));
-      this.current = { chunks: [tail], count: tail.length, silence: 0, text: '', sent: 0, final: false, done: false, overlap: true };
+      this.current = { chunks: [tail], count: tail.length, voiced: 0, text: '', sent: 0, final: false, done: false, overlap: true };
       this.segments.push(this.current);
       this.pump().catch(() => {});
     }
@@ -120,7 +167,7 @@ export class LiveTranscriber {
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const r = await fetch(this.endpoint + (final ? '&final=1' : ''), {
-            method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav(snapshot, this.rate),
+            method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav(normalize(snapshot), this.rate),
             signal: anySignal([this.controller.signal, timeoutSignal(45000)]),
           });
           let d; try { d = await r.json(); } catch { throw Error('Přepis dočasně neodpovídá.'); }
@@ -158,11 +205,11 @@ export class LiveTranscriber {
   }
 
   // Hrubý popis prostředí pro Verity („slyším, že je u tebe hluk“).
-  ambience() { return this.noise < 0.004 ? 'ticho' : this.noise < 0.012 ? 'mírný ruch' : 'hluk'; }
+  ambience() { return this.noiseDb < -58 ? 'ticho' : this.noiseDb < -45 ? 'mírný ruch' : 'hluk'; }
 }
 
 export async function startMicrophone(options = {}) {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
   let context;
   try {
     context = new AudioContext({ sampleRate: 16000 });

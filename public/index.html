@@ -54,6 +54,11 @@
 
   <div class="meter" id="meter" hidden><div class="bar"><i id="meter-fill"></i></div><span id="meter-val">0</span></div>
 
+  <div class="vad" id="vad" hidden title="Úroveň mikrofonu. Čárka = práh řeči, šedá = šum místnosti. Zelená = Verity tě slyší a přepisuje.">
+    <span class="vad-mic">🎙</span>
+    <div class="vad-bar"><i id="vad-noise"></i><i id="vad-fill"></i><b id="vad-thr"></b></div>
+    <span class="vad-label" id="vad-label">ticho</span>
+  </div>
   <div class="mic-state" id="mic-state" hidden aria-live="polite"></div>
   <form class="input" id="form" autocomplete="off">
     <input id="msg" maxlength="1000" placeholder="Napiš mi něco…" aria-label="Zpráva pro Verity">

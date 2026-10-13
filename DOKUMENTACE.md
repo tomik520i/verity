@@ -221,6 +221,7 @@ Whisper služba je sdílená s dalším projektem; klientská logika je převzat
 Tlačítko mikrofonu vedle pole pro text. Po kliknutí prohlížeč požádá o mikrofon (jen přes HTTPS). Během nahrávání:
 - tlačítko pulzuje červeně, pole je **jen ke čtení** (přepis by přepsal ruční úpravy) a průběžně se v něm objevuje přepis; pod polem je stav („Poslouchám…“, „přepis se upřesňuje“, „Dokončuji přepis…“, chyby);
 - Verity **poslouchá**: nakloní se blíž, oči dokořán, záře pulzuje podle tvého hlasu (`face.listening`, `face.hear`);
+- **ukazatel detekce řeči** pod polem: pruh s aktuální úrovní mikrofonu, šedá oblast = změřený šum místnosti, žlutá čárka = práh začátku řeči; když detektor slyší řeč, pruh zezelená a svítí **MLUVÍŠ**. Hned je vidět, jestli mikrofon vůbec něco zachytává a jestli jsi nad prahem;
 - indikátor **SLUCH** v liště ukazuje, jestli Whisper služba žije.
 
 | Režim | Kdy se zpráva odešle |
@@ -241,14 +242,21 @@ getUserMedia (echoCancellation, noiseSuppression, mono)
 **Proč PCM a ne MediaRecorder:** druhý a další kus WebM nemá hlavičky a nejde dekódovat samostatně; každý snímek tady je kompletní WAV s hlavičkou a skutečnou `context.sampleRate` (prohlížeč nemusí 16 kHz dodržet).
 
 ### LiveTranscriber (`live-audio.js`)
-- **Detekce řeči:** RMS bloku > adaptivní práh `max(0,007; min(0,026; šum·3))`; odhad šumu se učí jen z ticha mimo řeč.
-- **Předvzorky:** drží ~0,24 s před začátkem řeči, aby se neukrojilo první slovo.
+- **Detekce řeči (VAD) v decibelech s hysterezí** – přepis se řídí *jen* podle ní:
+  - úroveň každého bloku v dBFS; **šum pozadí** se měří jen mimo řeč (rychle dolů, pomalu nahoru), prvních 0,5 s je kalibrace;
+  - řeč **začne**, když je úroveň ≥ **9 dB nad šumem** aspoň 0,1 s (nejníž −64 dBFS);
+  - řeč **skončí**, když klesne pod **5 dB nad šumem** na déle než **0,8 s** – mezera mezi prahy (hystereze) brání rozsekání věty při každém poklesu hlasitosti;
+  - stálý hluk (ventilátor): když „řeč“ trvá > 6 s a minimum za poslední 2 s je pořád vysoko, šum se přeměří;
+  - když za 3 s nepřijde nic nad −75 dBFS → hláška „mikrofon nic nezachytává“.
+- **Promluva = úsek:** od začátku do konce řeči podle VAD (+ 0,35 s předvzorků, aby se neukrojilo první slovo). Úsek s méně než 0,3 s znělé řeči (klik, kašel) se zahodí a vůbec se neposílá.
+- **Normalizace:** před převodem do 16 bitů se úsek zesílí na špičku ~ −3 dBFS (max 30×) – tichý mikrofon by jinak měl jen pár bitů rozlišení.
+- `getUserMedia` se žádostí o `echoCancellation`, `noiseSuppression` i `autoGainControl`.
 - **Průběžný přepis:** každých 1,7 s pošle rostoucí snímek rozpracovaného úseku, pokud přibylo ≥ 1,45 s zvuku. Výsledek **nahrazuje** text úseku (nepřilepuje se).
-- **Úseky:** po 0,85 s ticha je úsek hotový (závěrečný přepis s `final=1`) – to samo nic neodesílá. Souvislá řeč se dělí po 24 s s 0,55 s překryvem; shodná slova na švu (max 12) se odstraní.
+- **Konec promluvy** podle VAD → závěrečný přepis s `final=1` (to samo zprávu neodesílá). Souvislá řeč se dělí po 24 s s 0,55 s překryvem; shodná slova na švu (max 12) se odstraní.
 - **Jeden požadavek najednou**, mezitím se sbírá další PCM. 429 / 5xx / timeout / síťová chyba → až 3 pokusy (po 0,8 s a 1,6 s); klientský timeout 45 s. Při chybě se automatické odeslání neprovede, rozpoznaný text zůstane k ruční opravě.
-- **Pauza pro auto režim:** `onPause` po ≥ 0,2 s řeči a 2,2 s ticha; když řeč pokračuje, čítač se resetuje.
-- **Úroveň hlasu** `onLevel(0–1, speech)` → animace poslechu; řeč zároveň odkládá „nečinnost“ (Verity nezačne mluvit sama, když mluvíš ty).
-- **Ruch v místnosti** `ambience()` z odhadu šumu: `ticho` < 0,004 < `mírný ruch` < 0,012 < `hluk` → jde do KONTEXTU.
+- **Pauza pro auto režim:** `onPause`, když VAD nehlásí řeč, padlo aspoň 0,3 s řeči a od jejího konce uběhlo 2,2 s; když řeč pokračuje, čítač se resetuje.
+- **Úroveň** `onLevel({db, noiseDb, onDb, offDb, speaking, level})` → ukazatel detekce + animace poslechu; řeč zároveň odkládá „nečinnost“ (Verity nezačne mluvit sama, když mluvíš ty).
+- **Ruch v místnosti** `ambience()` z odhadu šumu: `ticho` < −58 dBFS < `mírný ruch` < −45 dBFS < `hluk` → jde do KONTEXTU.
 - `AbortSignal.any` / `AbortSignal.timeout` mají fallback pro starší prohlížeče.
 
 ### Zastavení mikrofonu
@@ -267,7 +275,9 @@ getUserMedia (echoCancellation, noiseSuppression, mono)
 | API | `GET /health`, `POST /transcribe?live=1[&final=1]` s hlavičkou `X-STT-Key` |
 | Provoz | Windows plánovaná úloha (SYSTEM, při startu), hlídač ji po pádu restartuje za 10 s |
 
-Naměřeno na Verity (skutečná česká řeč pouštěná v reálném čase po 2048 vzorcích): průběžné texty v 5,2 / 7,0 / 9,9 s, závěrečný přepis bez chyby v 11,3 s; pauza 1,2 s mezi větami zprávu neodeslala, pauza 2,2 s na konci ano; čisté ticho = prázdný text. Přesnost: průběžně „mám radost, žej si tady“, závěrečně „že jsi tady“. V prohlížeči ověřeno s podstrčenou nahrávkou místo mikrofonu: živý text → automatické odeslání → odpověď; přerušení uprostřed řeči → Verity zmlkla, do historie šla jen řečená věta + `[přerušeno]`.
+**Test detekce** (česká řeč, 2 věty s pauzou 1,2 s, pouštěná v reálném čase): normální mikrofon (špička −17 dBFS), tichý (−48 dBFS), velmi tichý (−54 dBFS) i hlučná místnost (šum −39 dBFS) → vždy přesně 2 promluvy, 2 závěrečné přepisy a **bezchybný text**. Původní pevný práh (RMS 0,007 ≈ −43 dBFS) tichý mikrofon rozsekal na kousky slabik, ze kterých Whisper vrátil prázdný text – to byla příčina, proč mluvení v praxi nefungovalo. Server teď loguje každý přepis bez obsahu (`[stt] final 3.4s peak -39 dBFS → 200 47 znaků`).
+
+Naměřeno na první verzi (skutečná česká řeč pouštěná v reálném čase po 2048 vzorcích): průběžné texty v 5,2 / 7,0 / 9,9 s, závěrečný přepis bez chyby v 11,3 s; pauza 1,2 s mezi větami zprávu neodeslala, pauza 2,2 s na konci ano; čisté ticho = prázdný text. Přesnost: průběžně „mám radost, žej si tady“, závěrečně „že jsi tady“. V prohlížeči ověřeno s podstrčenou nahrávkou místo mikrofonu: živý text → automatické odeslání → odpověď; přerušení uprostřed řeči → Verity zmlkla, do historie šla jen řečená věta + `[přerušeno]`.
 
 ### Soukromí
 Zvuk odchází na server **už během nahrávání** (nutné pro živý přepis), ne až po Odeslat; LLM dostane text až podle režimu. Nahrávky se nikde neukládají. Tlačítko to říká v tooltipu.
