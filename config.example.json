@@ -1,0 +1,57 @@
+{
+  "port": 3700,
+  "host": "127.0.0.1",
+  "llm": {
+    "url": "http://127.0.0.1:8080",
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "presence_penalty": 0.4,
+    "max_tokens": 320,
+    "history_limit": 200
+  },
+  "tts": {
+    "url": "http://YOUR-OMNIVOICE-HOST:PORT",
+    "mode": "clone",
+    "instruct": "female, teenager, high pitch",
+    "seed": 4242,
+    "speaker_wav": "/path/to/omnivoice/references/verity_cs.wav",
+    "reference_text": "Přesný přepis referenční nahrávky.",
+    "language": "cs",
+    "num_step": 32,
+    "speed": 1,
+    "emotions": {
+      "whisper": {
+        "speed": 0.9
+      },
+      "sad": {
+        "speed": 0.92
+      },
+      "lonely": {
+        "speed": 0.88
+      },
+      "scared": {
+        "speed": 1.08
+      },
+      "excited": {
+        "speed": 1.12
+      },
+      "happy": {
+        "speed": 1.05
+      },
+      "angry": {
+        "speed": 1.08
+      },
+      "unhinged": {
+        "speed": 0.85
+      }
+    }
+  },
+  "stt": {
+    "url": "http://YOUR-WHISPER-HOST:PORT",
+    "key_file": "./stt.key"
+  },
+  "search": {
+    "python": "python3",
+    "searxng_url": "http://YOUR-SEARXNG-HOST:PORT"
+  }
+}

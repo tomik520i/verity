@@ -1,0 +1,6 @@
+config.json
+stt.key
+*.wav
+node_modules/
+__pycache__/
+.venv/

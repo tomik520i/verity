@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Verity</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23ffd21f'/%3E%3Cellipse cx='36' cy='40' rx='5' ry='9'/%3E%3Cellipse cx='64' cy='40' rx='5' ry='9'/%3E%3Cpath d='M30 62 Q50 80 70 62' stroke='%23000' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="scan"></div>
+  <div class="vignette"></div>
+
+  <header class="top">
+    <div class="brand">VERITY<span class="cursor">_</span></div>
+    <div class="status">
+      <span class="pill" id="st-llm"><i></i><b>…</b></span>
+      <span class="pill" id="st-tts"><i></i><b>HLAS</b></span>
+      <span class="pill" id="st-stt" hidden><i></i><b>SLUCH</b></span>
+      <span class="gpu" id="st-gpu"></span>
+      <button class="icon" id="menu-btn" aria-label="Nastavení">⋮</button>
+    </div>
+    <div class="menu" id="menu" hidden>
+      <label><input type="checkbox" id="opt-voice" checked> Hlas</label>
+      <label title="Po 2,2 s ticha se mluvená zpráva odešle sama"><input type="checkbox" id="opt-auto"> Mluvení: odeslat samo po pauze</label>
+      <label><input type="checkbox" id="opt-meter"> Ukázat pouto</label>
+      <button id="opt-memory" class="plain">Paměť…</button>
+      <button id="opt-reset">Zapomenout všechno</button>
+    </div>
+  </header>
+
+  <div class="memory-panel" id="memory-panel" hidden>
+    <div class="mem-head"><b>Co si Verity pamatuje</b><button class="icon" id="mem-close" aria-label="Zavřít">×</button></div>
+    <p class="mem-count" id="mem-count"></p>
+    <h4>Fakta o tobě</h4>
+    <ul id="mem-facts" class="mem-facts"></ul>
+    <h4>Deník</h4>
+    <ul id="mem-diary" class="mem-diary"></ul>
+    <div class="mem-actions">
+      <button id="mem-export" class="plain">Zálohovat do souboru</button>
+      <button id="mem-import" class="plain">Obnovit ze souboru</button>
+      <input type="file" id="mem-file" accept="application/json" hidden>
+    </div>
+  </div>
+
+  <main class="stage" id="stage">
+    <div class="face-wrap" id="face"></div>
+    <div class="subtitle" id="subtitle" aria-live="polite"></div>
+    <div class="search-line" id="search-line" hidden></div>
+  </main>
+
+  <section class="log" id="log"></section>
+
+  <div class="meter" id="meter" hidden><div class="bar"><i id="meter-fill"></i></div><span id="meter-val">0</span></div>
+
+  <div class="mic-state" id="mic-state" hidden aria-live="polite"></div>
+  <form class="input" id="form" autocomplete="off">
+    <input id="msg" maxlength="1000" placeholder="Napiš mi něco…" aria-label="Zpráva pro Verity">
+    <button type="button" id="mic" class="mic" aria-label="Mluvit" aria-pressed="false" title="Mluvit (zvuk se během nahrávání přepisuje na serveru)" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button type="submit" id="send" aria-label="Odeslat">➤</button>
+  </form>
+
+  <div class="wake" id="wake">
+    <div class="wake-inner">
+      <div class="wake-orb"></div>
+      <p class="wake-title">Something is waiting.</p>
+      <button id="wake-btn">PROBUDIT</button>
+      <p class="wake-hint">doporučeno se sluchátky</p>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
