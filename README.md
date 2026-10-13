@@ -22,7 +22,8 @@ Všechno běží na vlastním hardwaru doma – žádné cloudové API.
 - **Paměť** – sama si zapisuje fakta o tobě (`[pamatuj: …]`) a starší rozhovory shrnuje do deníku z vlastního pohledu. Všechno je v prohlížeči; panel „Paměť“ umí fakta mazat a zálohovat.
 - **Internet** – když potřebuje aktuální informace, řekne „počkej, mrknu se…“ a vyhledá je (SearXNG).
 - **Mobil** – vstup se drží nad klávesnicí, obličej se přizpůsobí.
-- **Podkres** – tlačítko ♪ pustí hudbu (hlasitost a opakování v menu); smajlík tančí a poskakuje přesně do rytmu, když Verity mluví, hudba se ztlumí. Hudba v repozitáři není – vlož vlastní `public/podkres.mp3` a časovou osu úderů vygeneruj `python tools/beats.py public/podkres.mp3` (bez ní se údery odhadují z basů za běhu).
+- **Podkres** – tlačítko ♪ pustí hudbu (hlasitost a opakování v menu); smajlík se do rytmu jen **jemně houpe** (plynule, ~1× za sekundu, bez skoků a bez blikání), když Verity mluví, hudba se ztlumí. Hudba v repozitáři není – vlož vlastní `public/podkres.mp3`; tempo zjistí `python tools/beats.py public/podkres.mp3` (jinak se počítá se 120 BPM).
+- **Bez blikání** – volba v menu vypne glitch efekty a problikávání; houpání i blikání se vypnou samy, když má systém zapnuté omezení pohybu (`prefers-reduced-motion`).
 
 ## Použité AI modely
 

@@ -83,24 +83,22 @@ function lipLoop(now) {
 }
 requestAnimationFrame(lipLoop);
 
-// ── podkres (hudba) + tanec do rytmu ─────────────────────────────────────────
-// <audio> → MediaElementSource → Analyser (detekce úderů z basů) → Gain (hlasitost, ztlumení
-// když Verity mluví) → reproduktory. Na úder smajlík vyskočí (face.beat), dokud hraje, tančí (face.dance).
-const music = { el: null, gain: null, analyser: null, data: null, avg: 0, lastBeat: 0, playing: false };
+// ── podkres (hudba) + jemné houpání ──────────────────────────────────────────
+// <audio> → MediaElementSource → Gain (hlasitost, ztlumení když Verity mluví) → reproduktory.
+// Dokud hraje, smajlík se jemně houpe v rytmu (face.dance, face.musicPhase).
+const music = { el: null, gain: null, tempo: null, playing: false };
 let musicVol = store.get('musicVol', 0.5), musicLoop = store.get('musicLoop', true);
 function initMusic() {
   if (music.el || !actx) return;
   const el = new Audio('podkres.mp3');
   el.loop = musicLoop; el.preload = 'auto';
   const src = actx.createMediaElementSource(el);
-  music.analyser = actx.createAnalyser(); music.analyser.fftSize = 1024; music.analyser.smoothingTimeConstant = 0.5;
   music.gain = actx.createGain(); music.gain.gain.value = musicVol;
-  src.connect(music.analyser); music.analyser.connect(music.gain); music.gain.connect(actx.destination);
-  music.data = new Uint8Array(music.analyser.frequencyBinCount);
+  src.connect(music.gain); music.gain.connect(actx.destination);
   el.onplay = () => { music.playing = true; musicUi(); };
   el.onpause = el.onended = () => { music.playing = false; musicUi(); };
-  music.el = el; music.idx = 0; music.lastT = 0;
-  fetch('podkres.beats.json').then(r => (r.ok ? r.json() : null)).then(d => { music.beats = d?.beats || null; }).catch(() => {});
+  music.el = el;
+  fetch('podkres.beats.json').then(r => (r.ok ? r.json() : null)).then(d => { music.tempo = d?.tempo || null; }).catch(() => {});
 }
 async function toggleMusic(on = !music.playing) {
   if (!actx) return;                       // až po probuzení (prohlížeč pustí zvuk jen po kliknutí)
@@ -113,30 +111,17 @@ function musicUi() {
   $('music-btn').classList.toggle('on', music.playing);
   $('music-play').textContent = music.playing ? '❚❚ Zastavit' : '▶ Pustit';
 }
+// Tanec je záměrně jemný: plynulé houpání v polovičním tempu skladby (z časové osy, jinak ~1 Hz),
+// žádné skoky na úder ani blikání. Vypnutý, když to uživatel zvolí nebo má systém omezení pohybu.
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+let danceOn = store.get('dance', true);
 function musicFrame(now) {
   requestAnimationFrame(musicFrame);
-  face.dance += ((music.playing ? 1 : 0) - face.dance) * 0.05;
-  if (!music.playing || !music.analyser) { face.beat *= 0.85; return; }
-  if (music.beats) {
-    // přesná časová osa úderů spočítaná předem (librosa beat tracking → podkres.beats.json)
-    const t = music.el.currentTime;
-    if (t < music.lastT - 0.5) music.idx = 0;                     // nové kolo smyčky
-    music.lastT = t;
-    while (music.idx < music.beats.length && music.beats[music.idx][0] < t - 0.25) music.idx++;   // přeskočené
-    if (music.idx < music.beats.length && t >= music.beats[music.idx][0]) {
-      face.beat = 0.55 + 0.45 * music.beats[music.idx][1];
-      music.idx++;
-    } else face.beat *= 0.86;
-  } else {
-    // záloha bez časové osy: úder = basy výrazně nad klouzavým průměrem (min. 230 ms od posledního)
-    music.analyser.getByteFrequencyData(music.data);
-    const hz = actx.sampleRate / music.analyser.fftSize, top = Math.max(2, Math.floor(160 / hz));
-    let bass = 0; for (let i = 1; i <= top; i++) bass += music.data[i];
-    bass /= top;
-    music.avg = music.avg * 0.95 + bass * 0.05;
-    if (bass > music.avg * 1.25 && bass > 60 && now - music.lastBeat > 230) { face.beat = 1; music.lastBeat = now; }
-    else face.beat = Math.max(face.beat * 0.88, Math.pow(bass / 255, 2) * 0.35);
-  }
+  const want = music.playing && danceOn && !reducedMotion.matches ? 1 : 0;
+  face.dance += (want - face.dance) * 0.03;                   // pomalý náběh i doběh
+  if (!music.playing || !music.gain) return;
+  const bpm = music.tempo || 120;
+  face.musicPhase = 2 * Math.PI * music.el.currentTime * (bpm / 60) / 2;   // polovina tempa
   // když Verity mluví, hudba se ztlumí na 30 %
   const target = musicVol * (current ? 0.3 : 1);
   music.gain.gain.value += (target - music.gain.gain.value) * 0.08;
@@ -603,7 +588,17 @@ window.addEventListener('beforeunload', e => {
 });
 
 // ── glitch ───────────────────────────────────────────────────────────────────
+// „Bez blikání“: vypne glitch a problikávání scanlines (ochrana citlivých lidí); zapne se samo
+// při systémovém omezení pohybu.
+let noFlash = store.get('noFlash', false);
+const flashOff = () => noFlash || reducedMotion.matches;
+function applyNoFlash() { document.body.classList.toggle('noflash', flashOff()); }
+applyNoFlash();
+reducedMotion.addEventListener?.('change', applyNoFlash);
+$('opt-noflash').checked = flashOff();
+$('opt-noflash').onchange = e => { noFlash = e.target.checked; store.set('noFlash', noFlash); applyNoFlash(); };
 setInterval(() => {
+  if (flashOff()) return;
   const p = Math.pow(instability / 100, 2) * 0.07 + (face.emotion === 'unhinged' ? 0.1 : face.emotion === 'angry' ? 0.03 : 0);
   if (Math.random() > p) return;
   const st = $('stage');
@@ -636,6 +631,8 @@ $('music-btn').onclick = () => toggleMusic();
 $('music-play').onclick = () => toggleMusic();
 $('music-vol').value = musicVol;
 $('music-vol').oninput = e => { musicVol = +e.target.value; store.set('musicVol', musicVol); };
+$('music-dance').checked = danceOn;
+$('music-dance').onchange = e => { danceOn = e.target.checked; store.set('dance', danceOn); };
 $('music-loop').checked = musicLoop;
 $('music-loop').onchange = e => { musicLoop = e.target.checked; store.set('musicLoop', musicLoop); if (music.el) music.el.loop = musicLoop; };
 $('opt-voice').checked = voiceOn;

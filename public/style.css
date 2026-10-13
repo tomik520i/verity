@@ -39,6 +39,8 @@ body {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: radial-gradient(ellipse at center, transparent calc(55% - var(--inst) * 20%), rgba(0,0,0,.9) 100%);
 }
+body.noflash .scan { animation: none; }
+@media (prefers-reduced-motion: reduce) { .scan, .cursor, .pill.on i, .search-line::before { animation: none; } }
 @keyframes flick { 0%, 96%, 100% { opacity: calc(.4 + var(--inst) * .6); } 97% { opacity: .15; } 98% { opacity: .9; } }
 
 /* ── horní lišta ───────────────────────────── */
@@ -60,7 +62,7 @@ body {
 .menu button { background: #2a0b0b; color: #ff8080; border: 1px solid #522; border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
 
 .music-btn { font-size: 18px; transition: color .2s, text-shadow .2s; }
-.music-btn.on { color: var(--accent); text-shadow: 0 0 10px var(--accent); animation: pulse 0.9s infinite; }
+.music-btn.on { color: var(--accent); }
 .music-box { display: grid; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #222; }
 .music-title { color: var(--muted); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; }
 .music-vol { display: flex; align-items: center; gap: 8px; }
