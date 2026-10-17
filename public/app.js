@@ -592,6 +592,24 @@ setInterval(() => {
 }, 1000);
 
 let titleTimer = null;
+// ── nezhasínat displej (Screen Wake Lock API) ────────────────────────────────
+// Prohlížeč zámek sám uvolní, když stránka zmizí z obrazovky (jiná záložka/aplikace);
+// po návratu se znovu požádá. Bez podpory (starší prohlížeč) se volba skryje.
+let wakeLock = null, keepAwake = store.get('keepAwake', true);
+const wakeLockSupported = 'wakeLock' in navigator;
+async function lockScreen() {
+  if (!keepAwake || !wakeLockSupported || !awake || document.hidden || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) { console.warn('wake lock:', e.message); }   // např. úsporný režim baterie
+}
+function unlockScreen() { wakeLock?.release().catch(() => {}); wakeLock = null; }
+$('opt-awake').closest('label').hidden = !wakeLockSupported;
+$('opt-awake').checked = keepAwake;
+$('opt-awake').onchange = e => { keepAwake = e.target.checked; store.set('keepAwake', keepAwake); keepAwake ? lockScreen() : unlockScreen(); };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) lockScreen(); });
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     hiddenAt = Date.now(); tabLeaves++;
@@ -683,6 +701,7 @@ history.filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-300)
 $('wake-btn').onclick = async () => {
   await initAudio();
   if (store.get('music', false)) toggleMusic(true);   // podkres hrál i minule → pokračovat
+  lockScreen();                                        // nezhasínat displej, dokud je Verity vidět
   awake = true;
   visits++; store.set('visits', visits);
   $('wake').classList.add('gone');
