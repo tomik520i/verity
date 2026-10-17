@@ -21,7 +21,7 @@ Všechno běží na vlastním hardwaru doma – žádné cloudové API.
 - **„Ví věci“** – dostává skutečné signály z prohlížeče: čas, jak dlouho jsi byl pryč, kolikrát jsi odešel ze záložky, jestli je u tebe ticho nebo hluk, teplotu GPU, na které běží („moje tělo“).
 - **Paměť** – sama si zapisuje fakta o tobě (`[pamatuj: …]`) a starší rozhovory shrnuje do deníku z vlastního pohledu. Všechno je v prohlížeči; panel „Paměť“ umí fakta mazat a zálohovat.
 - **Fotky (vision)** – 📷 na telefonu otevře foťák, na PC webkameru s náhledem; 🖼 vybere obrázek z galerie či disku, na PC jde i Ctrl+V nebo přetažení. Fotka se zmenší na max. 1280 px a pošle modelu (llama.cpp s `--mmproj`); do historie jde jen miniatura. Verity reaguje na to, co na fotce opravdu je, a lidi neidentifikuje.
-- **Přemýšlení (reasoning)** – volitelné: *automaticky* (výchozí – jen u fotek, výsledků hledání, výpočtů a proseb o pomoc), *vypnuto*, *vždy*. Benchmark: s přemýšlením skóre 94 vs 92, ale medián odpovědi 21,8 s místo 1,5 s – proto jen tam, kde to stojí za to. Myšlenky se nikdy nečtou nahlas, UI ukáže jen „přemýšlí…“.
+- **Přemýšlení (reasoning)** – volitelné: *automaticky* (výchozí – jen u dlouhých zpráv a proseb o vysvětlení/pomoc), *vypnuto*, *vždy*. Myšlenky se nikdy nečtou nahlas, UI ukáže jen „přemýšlí…“. Benchmark (33 scénářů × 3): Gemma 4 bez přemýšlení **99** b (automatické kontroly 100 %, medián 1,4 s); Qwen3.6 bez přemýšlení 92, s přemýšlením 94 b, ale 21,8 s. Gemma s přemýšlením odpovídá na fotku 28 s místo 6,6 s – proto jen výjimečně.
 - **Internet** – když potřebuje aktuální informace, řekne „počkej, mrknu se…“ a vyhledá je (SearXNG).
 - **Mobil** – vstup se drží nad klávesnicí, obličej se přizpůsobí.
 - **Podkres** – tlačítko ♪ pustí hudbu (hlasitost a opakování v menu); smajlík se do rytmu jen **jemně houpe** (plynule, ~1× za sekundu, bez skoků a bez blikání), když Verity mluví, hudba se ztlumí. Hudba v repozitáři není – vlož vlastní `public/podkres.mp3`; tempo zjistí `python tools/beats.py public/podkres.mp3` (jinak se počítá se 120 BPM).
@@ -31,7 +31,7 @@ Všechno běží na vlastním hardwaru doma – žádné cloudové API.
 
 | Účel | Model | Běh |
 |---|---|---|
-| **Konverzace + vidění (LLM)** | [Qwen3.6-35B-A3B](https://huggingface.co/Qwen) – multimodální MoE, ~3 B aktivních parametrů, GGUF `UD-IQ4_NL` + vision projektor `mmproj-F16` | [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` (OpenAI API, streaming), kontext 229k, KV cache q4_0, *thinking* vypnuté |
+| **Konverzace + vidění (LLM)** | [Gemma 4 26B-A4B-it](https://huggingface.co/google) – multimodální MoE (~4 B aktivních), GGUF `Q5_K_S` + vision projektor `mmproj-f16` (dříve Qwen3.6-35B-A3B) | [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` (OpenAI API, streaming, `--jinja`), kontext 214k, KV cache q4_0, 1 slot |
 | **Hlas (TTS)** | [OmniVoice](https://github.com/k2-fsa/OmniVoice) (k2-fsa; diffusion LM nad Qwen3-0.6B, zero-shot klonování, stovky jazyků) | PyTorch fp16 na GPU, režim klonování z české reference, 32 kroků, ~1 s na větu |
 | **Přepis řeči (STT)** | [Whisper large-v3-turbo](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo) | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) / CTranslate2, `int8_float32`, Silero VAD, čeština |
 | Přepis TTS reference | Whisper large-v3-turbo | jednorázově na CPU uvnitř OmniVoice |

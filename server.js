@@ -190,12 +190,12 @@ async function handleChat(req, res) {
     // Router: zjevný dotaz na aktuální informace → vyhledat ještě před odpovědí (model by si jinak
     // počasí nebo výsledky občas vymyslel). Model pak dostane výsledky přímo k poslední zprávě.
     const routed = detectSearch ? detectSearch(last.content) : null;
-    // Přemýšlení (reasoning): benchmark ukázal +2 body kvality za ~14× delší odpověď (1,5 s → 22 s).
-    // Režim „auto“ proto přemýšlí jen tam, kde to stojí za to: fotka, výsledky hledání, výpočet,
-    // delší zpráva nebo prosba o pomoc. Běžné povídání a události zůstávají rychlé.
+    // Přemýšlení (reasoning): u Qwenu +2 body kvality za ~14× delší odpověď (1,5 s → 22 s); Gemma 4
+    // má bez přemýšlení skóre 99 a přemýšlí ještě déle (fotka 6,6 s → 28 s). Režim „auto“ proto
+    // přemýšlí jen u delší zprávy nebo výslovné prosby o pomoc/vysvětlení; fotky, hledání i výpočty jsou rychlé.
     const mode = ['off', 'auto', 'on'].includes(body.thinking) ? body.thinking : (CFG.llm.thinking === true ? 'on' : CFG.llm.thinking || 'auto');
     const think = mode === 'on' || (mode === 'auto' && !last.content.startsWith('[[') && !ctx.crisis &&
-      (!!image || !!routed || !!ctx.calc || last.content.length > 160 ||
+      (last.content.length > 160 ||
        /(^|[^\p{L}])(vysvětli|vysvětlit|napiš|napsat|poraď|pomoz|pomoct|proč|jak (to|mám|se dá|funguje)|přelož|spočítej|porovnej|navrhni|shrň|oprav)(?!\p{L})/iu.test(last.content)));
     if (routed) {
       send({ search: routed });
