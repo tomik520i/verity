@@ -82,7 +82,11 @@ body.noflash .scan { animation: none; }
 .mem-count { color: var(--muted); font-size: 11px; }
 .memory-panel h4 { margin: 18px 0 6px; color: var(--muted); font-weight: 400; letter-spacing: .15em; text-transform: uppercase; font-size: 11px; }
 .memory-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.mem-facts li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; background: rgba(255,210,31,.05); border: 1px solid var(--line); border-radius: 8px; }
+.mem-facts li { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 10px; background: rgba(255,210,31,.05); border: 1px solid var(--line); border-radius: 8px; }
+.mem-facts .fact-text { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: text; }
+.mem-facts .fact-input { flex: 1; min-width: 0; background: #0d0d10; color: var(--fg); border: 1px solid rgba(255,210,31,.5); border-radius: 6px; padding: 4px 6px; font: inherit; }
+.mem-add { float: right; background: none; border: 1px solid #2c2a30; color: var(--muted); border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 11px; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.mem-add:hover { color: var(--accent); border-color: rgba(255,210,31,.4); }
 .mem-facts li button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
 .mem-facts li button:hover { color: var(--danger); }
 .mem-facts:empty::after, .mem-diary:empty::after { content: "zatím nic"; color: #3c3a35; }

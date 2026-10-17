@@ -241,6 +241,36 @@ ${formatResults(result)}`;
   res.end();
 }
 
+// ── úklid paměti: které staré fakty nové fakty / zpráva vyvrací ──────────────
+// Model při psaní odpovědi [zapomeň: …] spolehlivě nepoužívá (testy 0–3 ze 3), proto se po přidání
+// nového faktu zeptá zvlášť, stroze a s teplotou 0. Vrací indexy starých faktů k odstranění.
+async function handleConsolidate(req, res) {
+  const body = await readBody(req, 64 * 1024);
+  const strs = (a, n) => (Array.isArray(a) ? a : []).filter(s => typeof s === 'string').slice(0, n).map(s => s.slice(0, 300));
+  const old = strs(body.facts, 100), added = strs(body.added, 10);
+  const message = typeof body.message === 'string' ? body.message.slice(0, 1500) : '';
+  if (!old.length || !added.length) return json(res, 200, { forget: [] });
+  const prompt = `Udržuješ seznam faktů o uživateli. Uživatel právě napsal: „${message}“\n` +
+    `Nově přidané fakty:\n${added.map(f => '- ' + f).join('\n')}\n\nStarší fakty (číslované):\n${old.map((f, i) => `${i}: ${f}`).join('\n')}\n\n` +
+    'Které starší fakty jsou teď NEPRAVDIVÉ nebo ZASTARALÉ, protože je zpráva nebo nové fakty vyvracejí, nahrazují nebo už proběhly ' +
+    '(přestěhování, změna práce, rozchod, zrušený nebo proběhlý plán, oprava omylu)? Fakty, které stále platí nebo s novými nesouvisí, NEUVÁDĚJ. ' +
+    'Odpověz pouze JSON {"zapomenout": [čísla]}; když žádný, prázdné pole.';
+  try {
+    const r = await fetch(CFG.llm.url + '/v1/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(60000),
+      body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 60,
+        chat_template_kwargs: { enable_thinking: false }, response_format: { type: 'json_object' } }),
+    });
+    const d = await r.json();
+    const c = d.choices?.[0]?.message?.content || '{}';
+    const ids = (JSON.parse(c.slice(c.indexOf('{'), c.lastIndexOf('}') + 1)).zapomenout || [])
+      .map(Number).filter(i => Number.isInteger(i) && i >= 0 && i < old.length && !added.includes(old[i]));
+    json(res, 200, { forget: [...new Set(ids)].map(i => old[i]) });
+  } catch (e) {
+    json(res, 200, { forget: [], error: e.message });
+  }
+}
+
 // ── deník: shrnutí staršího úseku rozhovoru ──────────────────────────────────
 async function handleSummarize(req, res) {
   const body = await readBody(req, 512 * 1024);
@@ -406,7 +436,7 @@ function clientIp(req) {
   for (let i = chain.length - 1; i >= 0; i--) if (!PRIVATE.test(chain[i])) return chain[i];
   return chain[0] || req.socket.remoteAddress;
 }
-const LIMITS = { '/api/chat': 30, '/api/tts': 150, '/api/stt': 90, '/api/summarize': 6 };   // za minutu na IP
+const LIMITS = { '/api/chat': 30, '/api/tts': 150, '/api/stt': 90, '/api/summarize': 6, '/api/consolidate': 30 };   // za minutu na IP
 const buckets = new Map();
 let activePosts = 0;
 function overLimit(ip, route) {
@@ -434,6 +464,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/tts') return await handleTts(req, res);
     if (req.method === 'POST' && url.pathname === '/api/stt') return await handleStt(req, res);
     if (req.method === 'POST' && url.pathname === '/api/summarize') return await handleSummarize(req, res);
+    if (req.method === 'POST' && url.pathname === '/api/consolidate') return await handleConsolidate(req, res);
     if (req.method === 'GET' && url.pathname === '/api/status') {
       const [llm, tts, stt] = await Promise.all([ping(CFG.llm.url + '/health'), ping(CFG.tts.url + '/health'),
         CFG.stt?.url ? ping(CFG.stt.url + '/health') : false]);

@@ -232,6 +232,8 @@ function makeParser(onSegment, onShift, onFact) {
         const rawTag = pending.slice(1, j).trim(), tag = rawTag.toLowerCase(); pending = pending.slice(j + 1);
         const fact = rawTag.match(/^pamatuj\s*:\s*(.+)$/i);
         if (fact) { onFact(fact[1].trim()); continue; }
+        const forget = rawTag.match(/^zapome[nň]\s*:\s*(.+)$/i);
+        if (forget) { forgetFact(forget[1].trim()); continue; }
         const shift = tag.match(/^posun\s*:\s*([+-]?\d+)/);
         if (shift) { onShift(clamp(+shift[1], -15, 15)); continue; }
         if (EMOTIONS.includes(tag)) {
@@ -291,7 +293,9 @@ async function converse(content, isEvent = false, extra = {}, photo = null) {
   bubble = null; spokenSoFar = [];
   let raw = '', sources = null;
   const controller = chatAbort = new AbortController();
-  const parser = makeParser(seg => { if (!controller.signal.aborted) enqueue(seg); }, d => setInstability(instability + d), rememberFact);
+  const added = [];   // fakta zapsaná v této odpovědi → po ní úklid paměti (consolidateMemory)
+  const parser = makeParser(seg => { if (!controller.signal.aborted) enqueue(seg); }, d => setInstability(instability + d),
+    f => { const before = memory.facts.length; rememberFact(f); if (memory.facts.length > before) added.push(memory.facts.at(-1)); });
   const interruptedBefore = wasInterrupted; wasInterrupted = false;
   try {
     const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
@@ -349,6 +353,7 @@ async function converse(content, isEvent = false, extra = {}, photo = null) {
   lastVerityAt = Date.now();
   maybeCompact();
   if (!controller.signal.aborted) resumeConversation();
+  if (added.length && !isEvent) consolidateMemory(content.replace(/\s*\[\[FOTKA\]\]/, ''), added);
 }
 
 // ── paměť: fakta + deník ─────────────────────────────────────────────────────
@@ -358,6 +363,39 @@ function rememberFact(text) {
   memory.facts.push(t);
   if (memory.facts.length > 80) memory.facts.shift();
   saveMemory(); renderMemory();
+}
+
+// Úklid paměti po přidání nového faktu: server se modelu zvlášť zeptá, které starší fakty
+// zpráva nebo nové fakty vyvrací (přestěhování, rozchod, zrušený plán…), a ty se smažou.
+async function consolidateMemory(message, added) {
+  try {
+    const r = await fetch('api/consolidate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, added, facts: memory.facts }) });
+    const d = await r.json();
+    for (const f of d.forget || []) {
+      const i = memory.facts.indexOf(f);
+      if (i >= 0 && !added.includes(f)) { memory.facts.splice(i, 1); addLog('event', `· Verity zapomněla: ${f} ·`); }
+    }
+    saveMemory(); renderMemory();
+  } catch (e) { console.warn('úklid paměti:', e.message); }
+}
+
+// [zapomeň: …] – Verity si opraví paměť. Model nemusí fakt citovat doslova: vybere se nejpodobnější
+// (shoda slovních kmenů); když se nic dost nepodobá, nesmaže se nic.
+const stems = s => new Set(s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').match(/[a-z0-9]{3,}/g)?.map(w => w.slice(0, 4)) || []);
+function forgetFact(text) {
+  const want = stems(text);
+  let best = -1, score = 0;
+  memory.facts.forEach((f, i) => {
+    const have = stems(f);
+    const common = [...want].filter(w => have.has(w)).length;
+    const s = common / Math.max(1, Math.min(want.size, have.size));   // podíl shody vůči kratšímu
+    if (s > score) { score = s; best = i; }
+  });
+  if (best < 0 || score < 0.6) return;
+  const [removed] = memory.facts.splice(best, 1);
+  saveMemory(); renderMemory();
+  addLog('event', `· Verity zapomněla: ${removed} ·`);
 }
 
 // Když pracovní okno přeroste WINDOW_MAX, nejstarší úsek se na pozadí shrne do deníku
@@ -389,11 +427,16 @@ async function maybeCompact() {
 function renderMemory() {
   const facts = $('mem-facts'), diary = $('mem-diary');
   facts.innerHTML = ''; diary.innerHTML = '';
+  // fakta: ✎ upravit (Enter uloží, Esc zruší), × smazat
   memory.facts.forEach((f, i) => {
-    const li = document.createElement('li'); li.textContent = f;
+    const li = document.createElement('li');
+    const span = document.createElement('span'); span.className = 'fact-text'; span.textContent = f;
+    const edit = document.createElement('button'); edit.textContent = '✎'; edit.title = 'Upravit';
     const x = document.createElement('button'); x.textContent = '×'; x.title = 'Zapomenout';
     x.onclick = () => { memory.facts.splice(i, 1); saveMemory(); renderMemory(); };
-    li.appendChild(x); facts.appendChild(li);
+    edit.onclick = () => editFact(li, span, i);
+    span.ondblclick = () => editFact(li, span, i);
+    li.append(span, edit, x); facts.appendChild(li);
   });
   memory.diary.forEach(d => {
     const li = document.createElement('li');
@@ -403,6 +446,26 @@ function renderMemory() {
   $('mem-count').textContent = `${history.length} zpráv celkem · ${history.length - memory.windowStart} v pracovním okně · ${memory.facts.length} faktů · ${memory.diary.length} zápisů v deníku`;
 }
 
+function editFact(li, span, i) {
+  const input = document.createElement('input');
+  input.className = 'fact-input'; input.value = i < memory.facts.length ? memory.facts[i] : ''; input.maxLength = 200;
+  li.replaceChild(input, span); input.focus(); input.select();
+  let done = false;
+  const save = ok => {
+    if (done) return; done = true;
+    const v = input.value.replace(/\s+/g, ' ').trim();
+    if (ok && v) { if (i < memory.facts.length) memory.facts[i] = v; else memory.facts.push(v); saveMemory(); }
+    else if (ok && !v && i < memory.facts.length) { memory.facts.splice(i, 1); saveMemory(); }
+    renderMemory();
+  };
+  input.onkeydown = e => { if (e.key === 'Enter') save(true); if (e.key === 'Escape') save(false); };
+  input.onblur = () => save(true);
+}
+$('mem-add').onclick = () => {
+  const li = document.createElement('li'); const span = document.createElement('span');
+  li.appendChild(span); $('mem-facts').appendChild(li);
+  editFact(li, span, memory.facts.length);
+};
 $('opt-memory').onclick = () => { renderMemory(); $('memory-panel').hidden = false; $('menu').hidden = true; };
 $('mem-close').onclick = () => { $('memory-panel').hidden = true; };
 $('mem-export').onclick = () => {
