@@ -87,9 +87,9 @@ Galerie podporuje hromadný výběr až 10 obrázků; další výběr sadu dopln
 
 ## Hledání
 
-Právo hledat určuje aktuální výslovná lidská zpráva. Starý pokyn v historii, zmínka o hrách, stížnost na hledání ani klientský příznak toto právo nedávají. Kontrola je na serveru, ne pouze v promptu.
+Právo hledat určuje aktuální lidský pokyn včetně přímého potvrzení konkrétní nabídky a výslovného zopakování. [Návazné hledání](docs/NAVAZNE-HLEDANI.md) popisuje hranice, hlasovou opravu a ověření. Starý pokyn v historii, zmínka o hrách, stížnost na hledání ani klientský příznak toto právo nedávají. Kontrola je na serveru, ne pouze v promptu.
 
-Server odděluje plánování dotazu a zpracování výsledků od osobnosti. Zachytí nevyžádanou značku modelu, zahodí její předehru a omezeně zopakuje běžnou odpověď bez webu. Výsledky mají kontrolu úplnosti, počtu a ukončení generování. Selhání se hlásí jako selhání, ne jako dokončený seznam. Syntetické testy tyto cesty ověřují bez skutečného internetového hledání.
+Server odděluje plánování dotazu a zpracování výsledků od osobnosti. Zachytí nevyžádanou značku modelu i rozpoznané sliby hledání bez nástroje, zahodí jejich předehru a omezeně zopakuje běžnou odpověď bez webu. Výsledky mají kontrolu úplnosti, počtu a ukončení generování. Selhání se hlásí jako selhání, ne jako dokončený seznam. Syntetické testy tyto cesty ověřují bez skutečného internetového hledání.
 
 ## Paměť a soukromí
 

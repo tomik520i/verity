@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),temp=await fs.mkdtemp(path.join((await import('node:os')).tmpdir(),'verity-pipeline-'));
 await fs.mkdir(temp,{recursive:true});
 await fs.mkdir(path.join(temp,'public'),{recursive:true});
-for(const f of ['server.js','diagnostics.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs','public/image-limits.mjs','public/emotions.json'])await fs.copyFile(path.join(root,f),path.join(temp,f));
+for(const f of ['server.js','search-routing.js','diagnostics.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs','public/image-limits.mjs','public/emotions.json'])await fs.copyFile(path.join(root,f),path.join(temp,f));
 const python=process.argv[2];
 await fs.writeFile(path.join(temp,'search.py'),"import json,sys,os,time\nq=sys.argv[1]\nwith open(os.path.join(os.path.dirname(__file__),'calls.txt'),'a') as f:f.write('search\\n')\nif 'CEKEJ' in q:time.sleep(10)\nprint(json.dumps({'results':[],'error':'timeout'} if 'SELHANI' in q else {'results':[{'title':'Fixture','url':'https://fixture.invalid','snippet':'ověřený výsledek'}]}))\n");
 let replies=[],calls=[],closed=0;
@@ -27,7 +27,8 @@ const child=spawn(process.execPath,[path.join(temp,'server.js')],{windowsHide:tr
 child.stdout.on('data',c=>logs+=c);child.stderr.on('data',c=>logs+=c);
 const until=async fn=>{const end=Date.now()+6000;while(!fn()&&Date.now()<end)await sleep(30);assert.ok(fn(),logs)};
 const searchN=async()=>((await fs.readFile(path.join(temp,'calls.txt'),'utf8').catch(()=>'' )).match(/search/g)||[]).length;
-const chat=async (text,history=[],state={},image=null)=>{const r=await fetch('http://127.0.0.1:8796/api/chat',{method:'POST',headers:{'Content-Type':'application/json',...(Array.isArray(image)?{'X-Forwarded-For':'192.0.2.10'}:{})},body:JSON.stringify({messages:[...history,{role:'user',content:text}],thinking:'off',state,...(Array.isArray(image)?{images:image}:{image})})});return (await r.text()).split('\n').filter(l=>l.startsWith('data:')).map(l=>JSON.parse(l.slice(5)));};
+let requestSequence=0;
+const chat=async (text,history=[],state={},image=null)=>{const r=await fetch('http://127.0.0.1:8796/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Forwarded-For':'192.0.2.'+(++requestSequence)},body:JSON.stringify({messages:[...history,{role:'user',content:text}],thinking:'off',state,...(Array.isArray(image)?{images:image}:{image})})});return (await r.text()).split('\n').filter(l=>l.startsWith('data:')).map(l=>JSON.parse(l.slice(5)));};
 const answer='[happy] Už mám výsledky, tady je ten seznam.\n'+Array.from({length:10},(_,i)=>(i+1)+'. Hra '+(i+1)).join('\n')+' [pamatuj: nepatří do paměti] [posun:14]';
 try{
  await until(()=>logs.includes('Verity probuzena'));
@@ -48,6 +49,24 @@ try{
  replies=[{text:'[happy] Tady je návod pro Windows. [posun:0]'}];before=calls.length;events=await chat('Najdi dokumentaci Archivátoru Lipa.',past);assert.equal(calls.length,before+1);let ctx=JSON.parse(calls.at(-1).messages[1].content);assert.equal(ctx.recentConversation.length,2);assert.match(ctx.recentConversation[0].content,/Windows 11/);
  replies=[{text:JSON.stringify({query:'Archivátor Lipa Windows 11 vypnout zálohování',clarification:''})},{text:'[happy] Pro Windows otevři Úlohy. [posun:0]'}];before=calls.length;n=await searchN();events=await chat('Najdi, jak v něm vypnout zálohování.',past);assert.equal(calls.length,before+2);assert.equal(await searchN(),n+1);assert.match(events.find(e=>e.search).search,/Lipa Windows 11/);ctx=JSON.parse(calls.at(-1).messages[1].content);assert.equal(ctx.recentConversation.length,2);
  replies=[{text:'[sad] Rozumím, opravím předchozí odpověď. [posun:0]'}];n=await searchN();events=await chat('Proč mi pořád říkáš, že najdeš nejlepší hry roku 2026?',past);assert.equal(await searchN(),n);assert.ok(events.some(e=>e.done));
+
+ // Fresh repeat / immediate confirmation must actually run one tool, never just promise it.
+ const newsOffer=[{role:'user',content:'Znovu ty zprávy.'},{role:'assistant',content:'Chceš, abych ti zase posílala novinky ze světa?'}];
+ for(const c of [
+  {text:'No, znovu ty zprávy.',past:[{role:'user',content:'Najdi dnešní zprávy ze světa.'},{role:'assistant',content:'Tady je přehled.'}],reason:'requested_news'},
+  {text:'Jo, chci. Jo, dělej, šup, znova.',past:newsOffer,reason:'confirmed_offer'},
+  {text:'No ale tak to musíš nejít na tom internetu a říct mi to.',past:[...newsOffer,{role:'user',content:'Jo, chci.'},{role:'assistant',content:'Už to dělám.'}],state:{viaVoice:true},reason:'voice_retry'},
+ ]){
+  replies=[{text:JSON.stringify({query:'aktuální zprávy ze světa',clarification:''})},{text:'[neutral:40][mood:focused] Mám aktuální přehled ze zdroje Fixture. [posun:0]'}];
+  n=await searchN();before=calls.length;events=await chat(c.text,c.past,c.state||{});
+  assert.equal(await searchN(),n+1);assert.equal(calls.length,before+2);assert.ok(events.some(e=>e.search));assert.ok(events.some(e=>e.t?.includes('aktuální přehled')));assert.ok(events.some(e=>e.done));
+  assert.equal(JSON.parse(calls[before].messages[1].content).searchReason,c.reason);
+ }
+ for(const draft of ['[happy] Už to dělám. Jen mi chvíli dej prostor, abych všechno našla.','[calm] Už se na to dívám. Jen mi chvíli dej prostor, abych to všechno prohledala.']){
+  replies=[{text:draft},{text:'[neutral] Teď žádné hledání neběží. [posun:0]'}];n=await searchN();before=calls.length;events=await chat('Jo.',[{role:'user',content:'Jak se máš?'},{role:'assistant',content:'Dobře.'}]);
+  assert.equal(await searchN(),n);assert.equal(calls.length,before+2);assert.ok(!events.some(e=>e.t?.includes('Už')));assert.ok(events.some(e=>e.done));
+ }
+ assert.ok(logs.includes('unperformed_search_claim'));
 
  // Model nesmí sám udělit svolení, ani převzít svolení z historie nebo klienta.
  const noSearchCases=[

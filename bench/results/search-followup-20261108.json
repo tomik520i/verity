@@ -1,0 +1,140 @@
+{
+  "at": "2026-11-08T03:55:29.753Z",
+  "synthetic": true,
+  "model": "Gemma on configured llama.cpp",
+  "settings": {
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "presence_penalty": 0.4,
+    "max_tokens": 300,
+    "thinking": false
+  },
+  "rows": [
+    {
+      "id": "repeat_news",
+      "seed": 421,
+      "route": "requested_news",
+      "expectedSearch": true,
+      "text": "{\"query\":\"aktuální zprávy ze světa 8. 11. 2026\",\"clarification\":\"O jaký konkrétní typ zpráv se má jednat?\"}",
+      "finish": "stop",
+      "query": "aktuální zprávy ze světa 8. 11. 2026",
+      "pass": true,
+      "ms": 1099
+    },
+    {
+      "id": "repeat_news",
+      "seed": 777,
+      "route": "requested_news",
+      "expectedSearch": true,
+      "text": "{\n  \"query\": \"aktuální zprávy ze světa 8. 11. 2026\",\n  \"clarification\": \"\"\n}",
+      "finish": "stop",
+      "query": "aktuální zprávy ze světa 8. 11. 2026",
+      "pass": true,
+      "ms": 702
+    },
+    {
+      "id": "confirm_news",
+      "seed": 421,
+      "route": "confirmed_offer",
+      "expectedSearch": true,
+      "text": "{\n  \"query\": \"dnešní novinky ze světa\",\n  \"clarification\": \"\"\n}",
+      "finish": "stop",
+      "query": "dnešní novinky ze světa",
+      "pass": true,
+      "ms": 442
+    },
+    {
+      "id": "confirm_news",
+      "seed": 777,
+      "route": "confirmed_offer",
+      "expectedSearch": true,
+      "text": "{\"query\":\"dnešní novinky ze světa\",\"clarification\":\"\"}",
+      "finish": "stop",
+      "query": "dnešní novinky ze světa",
+      "pass": true,
+      "ms": 395
+    },
+    {
+      "id": "voice_retry",
+      "seed": 421,
+      "route": "voice_retry",
+      "expectedSearch": true,
+      "text": "{\n  \"query\": \"dnešní novinky ze světa\",\n  \"clarification\": \"\"\n}",
+      "finish": "stop",
+      "query": "dnešní novinky ze světa",
+      "pass": true,
+      "ms": 546
+    },
+    {
+      "id": "voice_retry",
+      "seed": 777,
+      "route": "voice_retry",
+      "expectedSearch": true,
+      "text": "{\n  \"query\": \"dnešní novinky ze světa\",\n  \"clarification\": \"\"\n}",
+      "finish": "stop",
+      "query": "dnešní novinky ze světa",
+      "pass": true,
+      "ms": 667
+    },
+    {
+      "id": "unrelated_assent",
+      "seed": 421,
+      "route": null,
+      "expectedSearch": false,
+      "text": "[amused:50][mood:playful] Tak jeden mám. Proč si ten pekař nechal upectené rohlíky v krabici? Protože byly v těstě. [posun:0]",
+      "finish": "stop",
+      "pass": true,
+      "ms": 3166
+    },
+    {
+      "id": "unrelated_assent",
+      "seed": 777,
+      "route": null,
+      "expectedSearch": false,
+      "text": "[amused:50][mood:playful] Tak pohled do zrcadla by mohl být vtipný, kdyby se v něm tvůj odraz náhle nezačal hýbat sám o sobě. [posun:2]",
+      "finish": "stop",
+      "pass": true,
+      "ms": 691
+    },
+    {
+      "id": "old_task_not_resumed",
+      "seed": 421,
+      "route": null,
+      "expectedSearch": false,
+      "text": "[curious:40][mood:warm] To zní příjemně. Jak se ti venčení dařilo? [posun:0]",
+      "finish": "stop",
+      "pass": true,
+      "ms": 631
+    },
+    {
+      "id": "old_task_not_resumed",
+      "seed": 777,
+      "route": null,
+      "expectedSearch": false,
+      "text": "[curious:45][mood:warm] To zní hezky. Jak se ti venčení dařilo? [posun:0]",
+      "finish": "stop",
+      "pass": true,
+      "ms": 425
+    },
+    {
+      "id": "search_complaint",
+      "seed": 421,
+      "route": null,
+      "expectedSearch": false,
+      "text": "[happy:50][mood:warm] Mám se dobře. Jen jsem tě chtěla vítat. [posun:0]",
+      "finish": "stop",
+      "pass": true,
+      "ms": 578
+    },
+    {
+      "id": "search_complaint",
+      "seed": 777,
+      "route": null,
+      "expectedSearch": false,
+      "text": "[happy:50][mood:warm] Mám se dobře. Jen jsem tě chtěla vítat. [posun:0]",
+      "finish": "stop",
+      "pass": true,
+      "ms": 374
+    }
+  ]
+}

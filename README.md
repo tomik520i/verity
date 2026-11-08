@@ -30,7 +30,7 @@ LLM, přepis i hlas běží na vlastním hardwaru. Hledání na internetu použ�
 - **Adaptativní paměť** – fakta s doložením původu, časem, expirací a opravami. Nové údaje nahrazují staré, dočasné zanikají. Panel Paměť umí ruční úpravy, mazání i zálohu a obnovu.
 - **Fotky (vision)** – v galerii lze označit až **10 obrázků najednou**. Další sady lze doplnit, vložit ze schránky nebo přetáhnout; náhledy se dají jednotlivě odebrat. Kamera na telefonu či webkamera na PC přidá další fotku. Model dostane obrázky v pořadí, do historie jdou miniatury.
 - **Přemýšlení (reasoning)** – automaticky, vypnuto nebo vždy. Živý hovor v automatickém režimu upřednostňuje rychlost; vnitřní myšlenky se nečtou nahlas. Testy a jejich omezení jsou v docs/ROLEPLAY.md.
-- **Internet** – hledá pouze na nový výslovný požadavek. Server blokuje nevyžádané hledání, kontroluje dokončení a počet výsledků a hlásí skutečné selhání.
+- **Internet** – hledá na nový požadavek, jeho přímé potvrzení nebo výslovné zopakování. [Návaznost a ochrana proti planým slibům](docs/NAVAZNE-HLEDANI.md). Server blokuje nevyžádané hledání, kontroluje dokončení a počet výsledků a hlásí skutečné selhání.
 - **Mobil** – vstup se drží nad klávesnicí, obličej se přizpůsobí.
 - **Podkres** – tlačítko ♪ pustí hudbu (hlasitost a opakování v menu); smajlík se do rytmu jen **jemně houpe** (plynule, ~1× za sekundu, bez skoků a bez blikání), když Verity mluví, hudba se ztlumí. Hudba v repozitáři není – vlož vlastní `public/podkres.mp3`; tempo zjistí `python tools/beats.py public/podkres.mp3` (jinak se počítá se 120 BPM).
 - **Bez blikání** – volba v menu vypne glitch efekty a problikávání; houpání i blikání se vypnou samy, když má systém zapnuté omezení pohybu (`prefers-reduced-motion`).
@@ -97,7 +97,7 @@ flowchart TD
     AUDIO --> FACE["AnalyserNode: pohyb úst + SVG emoce"]
 ```
 
-Přepis mikrofonu se průběžně opravuje. Gemma dostane hotový tah až při odeslání nebo po pauze, podle režimu. Paměť aktualizuje oddělený požadavek na stejnou Gemmu; server kontroluje doložení změn lidskou zprávou. Hledání smí spustit jen aktuální výslovný pokyn.
+Přepis mikrofonu se průběžně opravuje. Gemma dostane hotový tah až při odeslání nebo po pauze, podle režimu. Paměť aktualizuje oddělený požadavek na stejnou Gemmu; server kontroluje doložení změn lidskou zprávou. Hledání smí spustit jen aktuální pokyn, přímé potvrzení konkrétní nabídky nebo výslovné zopakování úkolu.
 
 ## Jak je aplikace poskládaná
 
@@ -115,7 +115,8 @@ Podrobnosti prahů, časování, protokolů, emocí, lip syncu, výměny animace
 ```
 server.js            HTTP server: statika, /api/chat (SSE), /api/tts, /api/stt, /api/summarize, /api/status
 prompt.js            osobnost, fáze nestability, značky a kontext
-research.js          povolení hledat, plánování a kontrola výsledků
+research.js          základní záměr, plánování a kontrola výsledků
+search-routing.js    návazné potvrzení, opakování a plané sliby
 memory-prompts.js    ověřené změny paměti a výběr citací
 search.py            SearXNG + extrakce textu stránek → JSON
 config.example.json  vzor konfigurace (zkopíruj na config.json)

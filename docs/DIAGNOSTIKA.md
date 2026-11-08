@@ -40,3 +40,5 @@ Kód: [server](../server.js), [úložiště a ověření](../diagnostics.js), [k
 ## Ověřené nasazení 8. listopadu 2026
 
 Přes skutečný prohlížeč proběhl syntetický rozhovor s nasazenou Gemmou. Správcovský čtecí skript následně načetl vstup, výstup i dvojice playback_start/playback_end obou vět. U zprávy o obětech přehrávač hlásil serious=true a náladu gloomy. Test používal vypnutý hlas (audio=false), takže ověřuje text, animaci a přenos diagnostiky, ne poslech reproduktoru. Čtení bez klíče skončilo 401; přímá adresa souboru klíče 404.
+
+Pro problémy s návazným hledáním sleduj searchReason v chat_start, query_resolution, search_start a research_answer. Blokovaný planý slib má důvod unperformed_search_claim. [Oprava a příklady](NAVAZNE-HLEDANI.md).

@@ -7,8 +7,9 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT, detectCrisis, detectCalc, detectFeedback } = require('./prompt');
 
-const { searchRequest, detectSearch, needsConversation, QUERY_PROMPT, requestedCount, outputBudget, RESEARCH_PROMPT, cleanResearch, researchProblem } = require('./research');
+const { QUERY_PROMPT, requestedCount, outputBudget, RESEARCH_PROMPT, cleanResearch, researchProblem } = require('./research');
 const { randomUUID } = require('crypto');
+const {resolveSearchRequest,unperformedSearchClaim}=require('./search-routing');
 const {createDiagnostics,clean:diagnosticText,UUID:DIAGNOSTIC_UUID}=require('./diagnostics');
 const { MEMORY_PROMPT } = require('./memory-prompts');
 const EXPRESSION_CATALOG=require('./public/emotions.json');
@@ -169,9 +170,10 @@ async function handleChat(req, res) {
     .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
   if (!history.length || history[history.length - 1].role !== 'user') return json(res, 400, { error: 'chybí zpráva' });
 
-  // Oprávnění platí jen pro tuto zprávu; historie ani klientský state ho nemohou udělit.
-  const searchAllowed = !!searchRequest(history[history.length - 1].content);
   const st = body.state || {};
+  // Oprávnění vyžaduje nový pokyn, přímé potvrzení nabídky nebo výslovné opakování.
+  const searchRoute=resolveSearchRequest(history,{viaVoice:st.viaVoice===true});
+  const searchAllowed=!!searchRoute;
   const num = (v, lo, hi) => (Number.isFinite(+v) ? Math.max(lo, Math.min(hi, +v)) : null);
   const {roleplayPreference} = await conversationMode;
   const roleplayPaused = typeof st.roleplayPaused === 'boolean'
@@ -220,7 +222,7 @@ async function handleChat(req, res) {
   res.once('close',()=>{if(!res.writableEnded)finishTrace(true);});
   trace('input',{text:diagnosticText(last.content,4000),imageCount:images.length,state:{instability:ctx.instability,mood:ctx.mood,normalConversation:ctx.normalConversation,viaVoice:ctx.viaVoice,searchAllowed},historyMessages:history.length});
   const log = (event, details = {}) => {console.log(JSON.stringify({ at: new Date().toISOString(), requestId, event, ...details }));trace(event,details);};
-  log('chat_start', { chars: last.content.length, live: ctx.liveVoice, phase: ctx.instability, historyMessages: history.length, searchAllowed });
+  log('chat_start', { chars: last.content.length, live: ctx.liveVoice, phase: ctx.instability, historyMessages: history.length, searchAllowed, searchReason:searchRoute?.reason||'no_current_request' });
   send({ requestId, ...(diagnostics.enabled?{diagnostics:diagnostics.receipt(requestId,conversationId)}:{}) });
   async function research(query) {
     // Poslední kontrola přímo před externím nástrojem; model tuto hranici nemůže obejít.
@@ -275,8 +277,8 @@ async function handleChat(req, res) {
     throw new Error('Z výsledků se nepodařilo sestavit úplnou odpověď');
   }
   try {
-    const contextual = history.slice(0, -1).some(m => m.role === 'user' && !m.content.startsWith('[[UDÁLOST]]')) && needsConversation(last.content);
-    const routed = !images.length ? detectSearch(last.content) : null;
+    const contextual = searchRoute?.contextual===true;
+    const routed = !images.length ? searchRoute?.query : null;
     const mode = ['off', 'auto', 'on'].includes(body.thinking) ? body.thinking : (CFG.llm.thinking === true ? 'on' : CFG.llm.thinking || 'auto');
     const think = mode === 'on' || (mode === 'auto' && !ctx.liveVoice && !last.content.startsWith('[[') && !ctx.crisis &&
       (last.content.length > 160 || /(^|[^\p{L}])(vysvětli|vysvětlit|napiš|napsat|poraď|pomoz|pomoct|proč|jak (to|mám|se dá|funguje)|přelož|spočítej|porovnej|navrhni|shrň|oprav)(?!\p{L})/iu.test(last.content)));
@@ -286,7 +288,7 @@ async function handleChat(req, res) {
         const recentConversation = history.slice(0, -1).filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-12);
         let planning = '';
         send({ thinking: true });
-        await streamLLM([{ role: 'system', content: QUERY_PROMPT }, { role: 'user', content: JSON.stringify({ question: last.content, recentConversation }) }], t => { planning += t; }, controller, () => {}, false, { maxTokens: 256, responseFormat: { type: 'json_object' } });
+        await streamLLM([{ role: 'system', content: QUERY_PROMPT }, { role: 'user', content: JSON.stringify({ question: last.content, recentConversation, searchReason:searchRoute.reason, date:new Date().toLocaleDateString('cs-CZ',{timeZone:'Europe/Prague'}) }) }], t => { planning += t; }, controller, () => {}, false, { maxTokens: 256, responseFormat: { type: 'json_object' } });
         send({ thinking: false });
         if (res.destroyed || controller.signal.aborted) return res.end();
         let parsed;
@@ -318,13 +320,14 @@ async function handleChat(req, res) {
         if (!query) filter.flush();
         if (res.destroyed || (!query && controller.signal.aborted)) break;
         // Zachytíme i uříznutou značku, kterou filtr nemohl uzavřít.
-        const blocked = !canSearch && (query !== null || /\[\s*hledat\s*:/i.test(draft));
+        const falseClaim=!canSearch&&unperformedSearchClaim(draft,{images:images.length>0});
+        const blocked = !canSearch && (query !== null || /\[\s*hledat\s*:/i.test(draft)||falseClaim);
         if (blocked) {
-          log('search_blocked', { reason: 'model_without_permission', attempt: attempt + 1 });
+          log('search_blocked', { reason: falseClaim?'unperformed_search_claim':'model_without_permission', attempt: attempt + 1 });
           controller = new AbortController();
           if (!attempt) {
             messages[0] = { ...messages[0], content: messages[0].content +
-              '\n\nPRO TUTO ODPOVĚĎ JE WEB VYPNUTÝ. Uživatel nedal nový výslovný pokyn k hledání. Odpověz přímo na jeho poslední zprávu z rozhovoru a vlastních znalostí. Nic nevyhledávej, nepoužívej značku hledat a neslibuj hledání. Pokud aktuální údaj neznáš, přiznej to. Starší úkoly už znovu neprováděj.' };
+              '\n\nPRO TUTO ODPOVĚĎ JE WEB VYPNUTÝ. Uživatel nedal nový výslovný pokyn k hledání. Odpověz přímo na jeho poslední zprávu z rozhovoru a vlastních znalostí. Nic nevyhledávej, nepoužívej značku hledat a neslibuj hledání. Žádná práce nepoběží po skončení odpovědi; neříkej „už to dělám“, „už se na to dívám“, „dej mi chvíli“ ani „abych to našla“. Pokud aktuální údaj neznáš, přiznej to. Starší úkoly už znovu neprováděj.' };
             continue;
           }
           send({ thinking: false });
