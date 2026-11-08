@@ -31,6 +31,8 @@ AudioWorklet převádí PCM na 16 kHz průběžným filtrem, včetně návaznost
 
 Přepis se posílá po částech přes API a zobrazuje se v rozepsané zprávě i stručně pod postavou. Průběžný výsledek může Whisper změnit. Odeslání do LLM čeká na finální přepis aktuálního tahu; neodesílá každé částečné slovo zvlášť.
 
+Průběžný režim po ukončení hovoru ani po návratu do záložky nespouští automatické monology. Starší režim si původní reakce na nečinnost zachovává.
+
 Průběžný hovor používá jeden otevřený mikrofon. Pauza je přibližně 1,05 s po koncové interpunkci, 1,4 s obecně a 2 s při zjevně nedokončené větě. Klient potlačuje dvojí odeslání, čeká na finální STT a hlídá změnu generace při ukončení. Pozdě dokončené oprávnění mikrofonu po zrušení vede k okamžitému uvolnění zařízení.
 
 Starší režim nahrává jednotlivou zprávu, maximálně 90 s; automatické odeslání používá pauzu 2,2 s. Navazující starší konverzační režim znovu otevírá mikrofon po odpovědi a při nečinnosti jej zavírá. V průběžném režimu jsou tyto dvě starší volby neaktivní.

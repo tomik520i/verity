@@ -883,7 +883,7 @@ document.addEventListener('pointerleave', () => face.lookAt(0, 0));
 $('msg').addEventListener('input', () => { typingUntil = performance.now() + 1500; face.lookAt(0, 1); lastUserAt = Date.now(); });
 
 setInterval(() => {
-  if (!awake || busy || playing || mic || micFinishing || liveSession || liveStarting || document.hidden || idleCount >= 3) return;
+  if (!awake || liveMode || busy || playing || mic || micFinishing || liveSession || liveStarting || document.hidden || idleCount >= 3) return;
   const quiet = (Date.now() - Math.max(lastUserAt, lastVerityAt)) / 1000;
   const limit = Math.max(35, 95 - instability * 0.6);
   if (quiet > limit) {
@@ -923,7 +923,7 @@ document.addEventListener('visibilitychange', () => {
     clearInterval(titleTimer); document.title = 'Verity';
     const away = hiddenAt ? (Date.now() - hiddenAt) / 1000 : 0;
     hiddenAt = null;
-    if (awake && away > 15 && !busy) {
+    if (awake && !liveMode && away > 15 && !busy) {
       setInstability(instability + 3 + Math.min(10, away / 60));
       const t = away < 120 ? `${Math.round(away)} sekund` : `${Math.round(away / 60)} minut`;
       converse(`[[UDÁLOST]] Člověk se právě vrátil do tvé záložky. Byl ${t} pryč, někde jinde. Už ${tabLeaves}× za tuhle návštěvu.`, true);
