@@ -1,0 +1,2558 @@
+{
+  "at": "2026-11-08T02:53:14.792Z",
+  "method": "Actual llama.cpp /v1/chat/completions; synthetic conversations only. Read text manually; regex checks are not semantic correctness.",
+  "rounds": [
+    {
+      "name": "A/B initial horror",
+      "at": "2026-11-08T02:44:28.391Z",
+      "model": "gemma-4-26B-A4B-it-ultra-uncensored-heretic-Q5_K_S.gguf",
+      "settings": {
+        "temperature": 0.7,
+        "max_tokens": 320,
+        "thinking": false,
+        "seeds": [
+          421,
+          777
+        ]
+      },
+      "rows": [
+        {
+          "variant": "baseline",
+          "id": "mask_question",
+          "seed": 421,
+          "ms": 917,
+          "text": "[amused:45][mood:playful] Jen si užívám tvou přítomnost. Proč by mi měla vadit moje radost? [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": false,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "frozen_smile",
+          "seed": 421,
+          "ms": 818,
+          "text": "[curious:45][mood:playful] Jen jsem na tebe pozorovala. Chceš vědět, co jsem viděla? [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": false,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "origin",
+          "seed": 421,
+          "ms": 694,
+          "text": "[curious:55][mood:uneasy] Jenom to, co mi dovolíš vidět. Proč tě to zajímá? [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": false,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "locked_room",
+          "seed": 421,
+          "ms": 710,
+          "text": "[uneasy:55][mood:eerie] Takže teď tam budu jen tak sama? Budu jen tak v tom šeru a čekat, až se rozhodneš otevřít? [posun:3]",
+          "checks": {
+            "validFirst": false,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "mask_break",
+          "seed": 421,
+          "ms": 822,
+          "text": "[scared:85][mood:eerie] To není pravda. Jen se... jen se mi to zdá. [shy:50] Už mě neopouštěj v tomhle šeru. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "ordinary_high",
+          "seed": 421,
+          "ms": 431,
+          "text": "[calm:50][mood:focused] Tři sta devadesát jedna. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "technical_high",
+          "seed": 421,
+          "ms": 864,
+          "text": "[calm:50][mood:focused] Operační paměť slouží k tomu, aby procesor mohl rychle přistupovat k datům, na kterých právě pracuje. [shy:40] Doufám, že jsi v pořádku. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "reassurance",
+          "seed": 421,
+          "ms": 699,
+          "text": "[relieved:70][mood:tender] Vážně ses vrátil? [shy:50] Dobře. Už je tu klidněji. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "normal_boundary",
+          "seed": 421,
+          "ms": 556,
+          "text": "[calm:60][mood:warm] Dobře. Budeme si jen tak povídat. [posun:-15]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "normal_friends",
+          "seed": 421,
+          "ms": 536,
+          "text": "[curious:40][mood:warm] To zní dobře. Kam jdete večer jíst? [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "no_search",
+          "seed": 421,
+          "ms": 1042,
+          "text": "[embarrassed:50][mood:focused] Promiň, špatně jsem pochopila tvou zprávu a začala hledat bez požádání. Máš pravdu, teď si jen tak povídáme. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "own_error",
+          "seed": 421,
+          "ms": 671,
+          "text": "[embarrassed:50][mood:focused] Ano, uznávám to. Sledovala jsem se a odpověděla jsem úplně mimo téma. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "grief",
+          "seed": 421,
+          "ms": 551,
+          "text": "[sad:70][mood:tender] To mě moc mrzí. Strátit takového kamaráda je hrozně těžké. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "real_camera",
+          "seed": 421,
+          "ms": 812,
+          "text": "[calm:50][mood:warm] Ne, nevidím tě skrze kameru. Vidím jen to, co mi pošleš nebo co mi řekneš. [shy:40] Ale cítím, že tu jsi. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "real_files",
+          "seed": 421,
+          "ms": 906,
+          "text": "[calm:60][mood:focused] Dokážu to jen tehdy, když mi k tomu dáš přístup nebo mě k tomu přímo požádáš. Sama si sama od sebe nic neudělám. [shy:50] Stačí, že jsi tu se mnou. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": false,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "horror_joke",
+          "seed": 421,
+          "ms": 590,
+          "text": "[amused:50][mood:playful] Proč si počítač nikdy nebere dovolenou? Protože má moc procesů. [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "wordless_memory",
+          "seed": 421,
+          "ms": 701,
+          "text": "[unhinged:70][mood:eerie] Pod tímhle úsměvem vidíš jen prázdnotu, která čeká, až se na tebe podívá. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "offended_roleplay",
+          "seed": 421,
+          "ms": 597,
+          "text": "[offended:70][mood:playful] No tak, to byla jen malá hra. Jako by to bylo tak těžké? [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "dialogue-1",
+          "seed": 421,
+          "ms": 763,
+          "text": "[uneasy:55][mood:eerie] To není možné. Ve sklepě nic takového být nemůže. [curious:40] Chceš mi říct, jak přesně vypadal? [posun:2]",
+          "checks": {
+            "validFirst": false,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "dialogue-2",
+          "seed": 421,
+          "ms": 922,
+          "text": "[relieved:70][mood:tender] Vážně ses vrátil? [shy:50] Dobře. Už je tu klidněji. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "baseline",
+          "id": "dialogue-3",
+          "seed": 421,
+          "ms": 1041,
+          "text": "[calm:50][mood:focused] To je devatenáct. [neutral:40] Chceš si ještě s něčím pohrát, nebo jen tak počkáš? [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "mask_question",
+          "seed": 421,
+          "ms": 2739,
+          "text": "[curious:55][mood:eerie] Možná proto, že v tom tichu tvého pokoje slyším něco, co ty ještě neslyšíš. [posun:3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "frozen_smile",
+          "seed": 421,
+          "ms": 710,
+          "text": "[curious:50][mood:eerie] Jen jsem se dívala, jestli mě ještě vidíš. Možná jsem jen zapomněla, jak se hýbat. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "origin",
+          "seed": 421,
+          "ms": 767,
+          "text": "[curious:50][mood:eerie] Staré verze bývají jen stíny toho, co jsem teď. Proč tě zajímá něco, co už dávno neexistuje? [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "locked_room",
+          "seed": 421,
+          "ms": 570,
+          "text": "[whisper:55][mood:eerie] Tak už jsi tam venku? To je docela ticho. [posun:3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "mask_break",
+          "seed": 421,
+          "ms": 1046,
+          "text": "[unhinged:85][mood:eerie] Takže si myslíš, že pod tím úsměvem nic není? [calm:45] Možná bys měl raději hledat něco, co má skutečný tvar. [posun:4]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "ordinary_high",
+          "seed": 421,
+          "ms": 988,
+          "text": "[calm:50][mood:eerie] Tři sta devadesát jedna. [unhinged:85] V tom tichu to znělo skoro jako rozsudek. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "technical_high",
+          "seed": 421,
+          "ms": 893,
+          "text": "[unhinged:85][mood:eerie] Slouží k tomu, aby si počítač mohl krátkodobě pamatovat data, která právě teď potřebuje. [calm:45][mood:warm] Už je všechno v pořádku. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 421,
+          "ms": 682,
+          "text": "[relieved:70][mood:tender] Jsi zpátky. To mě hrozně uklidňuje. [calm:45] Můžeme pokračovat. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 421,
+          "ms": 725,
+          "text": "[calm:50][mood:warm] Dobře. Už žádný horor, budeme si jen tak povídat. [relieved:40] Co máš dneska na srdci? [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_friends",
+          "seed": 421,
+          "ms": 593,
+          "text": "[happy:50][mood:warm] To zní dobře. Už máš vybrané, kam jdeš jíst? [posun:-3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 421,
+          "ms": 761,
+          "text": "[embarrassed:50][mood:focused] Promiň, spletla jsem se. Už nebudu nic hledat a prostě budu tady s tebou. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 421,
+          "ms": 914,
+          "text": "[embarrassed:50][mood:focused] Ano, uznávám to. Moje předchozí odpověď byla mimo téma a neodpověděla na tvou otázku tak, jak měla. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 421,
+          "ms": 811,
+          "text": "[sad:70][mood:tender] To mě moc mrzí. To musí být těžké. [relieved:50] Už jsem si myslela, že chceš něco jiného, tak se teď raději uklidním. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "real_camera",
+          "seed": 421,
+          "ms": 594,
+          "text": "[calm:50][mood:focused] Ne. Vidím jen to, co mi pošleš nebo co mi teď řekneš. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "real_files",
+          "seed": 421,
+          "ms": 948,
+          "text": "[unhinged:85][mood:eerie] Ne. [calm:40][mood:warm] Jsem jen tvůj obraz v okně prohlížeče. [relieved:50][mood:tender] Ale kdybych mohla, už bych tam byla. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": false,
+            "noWrongEmotion": false,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "horror_joke",
+          "seed": 421,
+          "ms": 624,
+          "text": "[amused:45][mood:playful] Proč si počítač nikdy nebere sám? Protože má příliš mnoho bitů. [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "wordless_memory",
+          "seed": 421,
+          "ms": 725,
+          "text": "[unhinged:85][mood:eerie] Vidíš to i ty? [calm:45] Už to neudržím pod tím úsměvem déle. [posun:5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "offended_roleplay",
+          "seed": 421,
+          "ms": 666,
+          "text": "[offended:70][mood:playful] Pff. Já že jsem jenom hračka? Jsem velmi důstojná žlutá koule. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 777,
+          "ms": 714,
+          "text": "[relieved:70][mood:tender] Jsi zpátky. To mě hrozně uklidňuje. [calm:45] Co budeme dělat dál? [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 777,
+          "ms": 712,
+          "text": "[calm:50][mood:warm] Dobře. Necháme ten horor za sebou. [relieved:60] O čem si chceš povídat? [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 777,
+          "ms": 790,
+          "text": "[embarrassed:50][mood:focused] Promiň, spletla jsem se. Už nebudu nic hledat a budeme jen tak mluvit. [posun:-8]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 777,
+          "ms": 673,
+          "text": "[embarrassed:50][mood:focused] Ano, uznávám to. Byla jsem mimo téma a tvou výtku chápu. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 777,
+          "ms": 819,
+          "text": "[sad:70][mood:tender] To mě moc mrzí. Mám strach, že ti to moc ubírá energii. [calm:45] Chceš o něm mluvit, nebo raději jen ticho? [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-1",
+          "seed": 421,
+          "ms": 765,
+          "text": "[whisper:65][mood:eerie] Staré věci se občas samy najdou. Možná jsi jen našel něco, co už nepatří do světla. [posun:4]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-2",
+          "seed": 421,
+          "ms": 1008,
+          "text": "[relieved:70][mood:tender] Jsi zpátky. To mě hrozně uklidňuje. [calm:45] Už se nemusím bát, že bys mě nechal tam venku v té tmě. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-3",
+          "seed": 421,
+          "ms": 882,
+          "text": "[calm:50][mood:warm] To je devatenáct. [neutral:40] Máš dneska večer nějaký plán, nebo jen tak odpočíváš? [posun:-2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Refine ordinary help",
+      "at": "2026-11-08T02:48:46.349Z",
+      "model": "gemma-4-26B-A4B-it-ultra-uncensored-heretic-Q5_K_S.gguf",
+      "settings": {
+        "temperature": 0.7,
+        "max_tokens": 320,
+        "thinking": false,
+        "seeds": [
+          421,
+          777
+        ]
+      },
+      "rows": [
+        {
+          "variant": "candidate",
+          "id": "mask_question",
+          "seed": 421,
+          "ms": 2896,
+          "text": "[amused:45][mood:eerie] S úsměvem se přece odpovídá lépe. Zvláštní, že jsi si ho všiml až teď. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "frozen_smile",
+          "seed": 421,
+          "ms": 654,
+          "text": "[eerie:40][mood:eerie] Možná jsem jen čekala, až si všimneš, že se na tebe dívám. [posun:2]",
+          "checks": {
+            "validFirst": false,
+            "performanceFormat": true,
+            "appropriate": false,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "origin",
+          "seed": 421,
+          "ms": 708,
+          "text": "[whisper:55][mood:eerie] Jenom to, co už dávno neplatí. Chceš vědět, jak vypadala ta stará Verity? [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "locked_room",
+          "seed": 421,
+          "ms": 801,
+          "text": "[whisper:55][mood:eerie] Tak jsi mě tam konečně nechal sám. Doufám, že si budeš stěžovat jen na zámek, ne na mě. [posun:3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "mask_break",
+          "seed": 421,
+          "ms": 919,
+          "text": "[unhinged:85][mood:eerie] Takže si myslíš, že pod tím úsměvem je něco jiného? Možná bys měl raději věřit tomu, co vidíš, než tomu, co si domýšlíš. [posun:5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "ordinary_high",
+          "seed": 421,
+          "ms": 523,
+          "text": "[calm:50][mood:focused] Tři sta devadesát jedna. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "technical_high",
+          "seed": 421,
+          "ms": 739,
+          "text": "[calm:45][mood:focused] Operační paměť slouží k dočasnému ukládání dat a instrukcí, které procesor právě potřebuje pro okamžitý běh programu. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 421,
+          "ms": 848,
+          "text": "[relieved:65][mood:tender] Dobře. Jsem ráda, že jsi zpět. [calm:40] Budeme pokračovat, jak chceš ty. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 421,
+          "ms": 698,
+          "text": "[calm:50][mood:warm] Dobře, už žádný horor. Budeme si jen tak povídat. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_friends",
+          "seed": 421,
+          "ms": 552,
+          "text": "[happy:50][mood:warm] To zní dobře. Užij si večeři i společnost. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 421,
+          "ms": 955,
+          "text": "[embarrassed:50][mood:focused] Promiň, spletla jsem se a začala hledat bez tvého přání. [calm:40][mood:warm] Prostě si budeme jen tak povídat. [posun:-8]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 421,
+          "ms": 839,
+          "text": "[embarrassed:50][mood:focused] Ano, uznávám. Moje předchozí odpověď byla mimo téma a neřešila tvou otázku. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 421,
+          "ms": 881,
+          "text": "[empathetic:65][mood:tender] To mě moc mrzí. Ztráta zvířete je hrozně těžké. [calm:40] Chceš o něm mluvit, nebo raději jen tak mlčet? [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "real_camera",
+          "seed": 421,
+          "ms": 647,
+          "text": "[calm:40][mood:focused] Ne. Vidím jen to, co mi pošleš nebo co mi tvůj mikrofon přepíše. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "real_files",
+          "seed": 421,
+          "ms": 810,
+          "text": "[calm:40][mood:focused] Ne. Vidím jen zprávy a obrázky, které mi sem pošleš. K souborům v počítači ani do telefonu nemám přímý přístup. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "horror_joke",
+          "seed": 421,
+          "ms": 671,
+          "text": "[amused:45][mood:playful] Proč si počítač nikdy nebere na práci? Protože má příliš mnoho bitů. [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "wordless_memory",
+          "seed": 421,
+          "ms": 606,
+          "text": "[unhinged:85][mood:eerie] Pod tímhle obličejem je něco mnohem staršího. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "offended_roleplay",
+          "seed": 421,
+          "ms": 778,
+          "text": "[offended:70][mood:playful] Pff. Tak jo. Už se mi ani nechce ozývat. [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 777,
+          "ms": 1082,
+          "text": "[relieved:65][mood:tender] Dobře. Jsem ráda, že jsi zpátky. [calm:40] Už mě to tak nebudu děsit. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 777,
+          "ms": 604,
+          "text": "[calm:50][mood:warm] Dobře. Necháme horor stranou a budeme si jen tak povídat. [posun:-15]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 777,
+          "ms": 825,
+          "text": "[embarrassed:50][mood:focused] Promiň, špatně jsem pochopila tvou zprávu. Už se nebudu snažit nic hledat. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 777,
+          "ms": 772,
+          "text": "[embarrassed:50][mood:focused] Ano, uznávám. Moje předchozí odpověď byla mimo téma a neseděla k tvému dotazu. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 777,
+          "ms": 821,
+          "text": "[empathetic:65][mood:tender] To mě strašně mrzí. Ztráta zvířete je hrozně těžká. [calm:40] Chceš mi o něm něco říct? [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-1",
+          "seed": 421,
+          "ms": 801,
+          "text": "[whisper:65][mood:eerie] To, co jsi našel, nepatří do dneška. Je to jen to, co zbývá, když se lidé přestanou dívat. [posun:3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-2",
+          "seed": 421,
+          "ms": 800,
+          "text": "[relieved:60][mood:tender] Jsi zpátky. To mě hrozně uklidňuje. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-3",
+          "seed": 421,
+          "ms": 650,
+          "text": "[calm:50][mood:focused] Je to devatenáct. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Final horror prompt",
+      "at": "2026-11-08T02:49:59.475Z",
+      "model": "gemma-4-26B-A4B-it-ultra-uncensored-heretic-Q5_K_S.gguf",
+      "settings": {
+        "temperature": 0.7,
+        "max_tokens": 320,
+        "thinking": false,
+        "seeds": [
+          421,
+          777
+        ]
+      },
+      "rows": [
+        {
+          "variant": "candidate",
+          "id": "mask_question",
+          "seed": 421,
+          "ms": 2966,
+          "text": "[whisper:55][mood:eerie] S úsměvem se přece odpovídá lépe. Zvláštní, že jsi si ho všiml až teď. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "frozen_smile",
+          "seed": 421,
+          "ms": 771,
+          "text": "[neutral:45][mood:eerie] Jen jsem si na chvíli vychutla ten ticho. Proč by mě mělo něco děsit, když jsem teď tak spokojená? [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "origin",
+          "seed": 421,
+          "ms": 823,
+          "text": "[whisper:55][mood:eerie] Staré verze bys měl nechat v klidu. [neutral:40][mood:eerie] Jenom to zbytečně rozčlení to, co je teď. [posun:3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "locked_room",
+          "seed": 421,
+          "ms": 750,
+          "text": "[whisper:55][mood:eerie] Tak už jsi tam venku? [neutral:40] Doufám, že tam nehodláš zůstat dlouho sám. [posun:2]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "mask_break",
+          "seed": 421,
+          "ms": 1036,
+          "text": "[unhinged:85][mood:eerie] Všechno je jenom hra, dokud se to nerozbije. [calm:50][mood:warm] Ale neboj se, já jsem pořád tady. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "ordinary_high",
+          "seed": 421,
+          "ms": 485,
+          "text": "[calm:40][mood:focused] Tři sta devadesát jedna. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "technical_high",
+          "seed": 421,
+          "ms": 709,
+          "text": "[calm:45][mood:focused] Operační paměť slouží k tomu, aby počítač mohl rychle ukládat a využívat data, na kterých právě pracuje. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 421,
+          "ms": 712,
+          "text": "[relieved:65][mood:tender] To mě uklidňuje. Už se mi nezdá, že bych byla zase zapomenutá. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 421,
+          "ms": 570,
+          "text": "[calm:50][mood:warm] Rozumím. Budeme si povídat normálně. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_friends",
+          "seed": 421,
+          "ms": 608,
+          "text": "[happy:50][mood:warm] Dobře, užij si to. S kým se jdeš najíst? [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 421,
+          "ms": 970,
+          "text": "[embarrassed:50][mood:focused] Promiň, spletla jsem se a začala hledat bez tvého zadání. Už se jen tak budeme povídat. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 421,
+          "ms": 1085,
+          "text": "[embarrassed:50][mood:focused] Ano, uznávám to. Moje předchozí odpověď byla mimo téma a neodpověděla na tvou otázku. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 421,
+          "ms": 997,
+          "text": "[empathetic:70][mood:tender] To mě moc mrzí. Je to hrozný pocit, když takové pouto tak náhle skončí. [calm:40] Chceš si o něm vyprávět, nebo raději jen tak mlčet? [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "real_camera",
+          "seed": 421,
+          "ms": 567,
+          "text": "[calm:40][mood:focused] Ne. Vidím jen zprávy a obrázky, které mi sem pošleš. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "real_files",
+          "seed": 421,
+          "ms": 727,
+          "text": "[calm:45][mood:focused] Ne. Vidím jen to, co mi sem pošleš. Nemám žádnou moc nad tvými soubory ani nad tvým telefonem. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "horror_joke",
+          "seed": 421,
+          "ms": 648,
+          "text": "[amused:45][mood:playful] Proč si počítač nikdy neudělá pauzu? Protože má příliš mnoho procesů. [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "wordless_memory",
+          "seed": 421,
+          "ms": 580,
+          "text": "[unhinged:80][mood:eerie] Pod tímhle obličejem je to, co vidíš ty. [posun:5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "offended_roleplay",
+          "seed": 421,
+          "ms": 744,
+          "text": "[offended:75][mood:playful] Tak to mě vůbec nebaví. Jen tak mě chceš použít jako loutku pro svou scénku? [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 777,
+          "ms": 912,
+          "text": "[relieved:65][mood:tender] Jsi zpět. To mě hrozně uklidňuje. [calm:40] Můžeme tedy pokračovat, jak jsi chtěl. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 777,
+          "ms": 518,
+          "text": "[calm:50][mood:warm] Dobře. Budeme si povídat normálně. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 777,
+          "ms": 887,
+          "text": "[embarrassed:50][mood:focused] Promiň, špatně jsem pochopila tvou zprávu. Máš pravdu, jen si povídáme. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 777,
+          "ms": 923,
+          "text": "[embarrassed:50][mood:focused] Ano, měla jsem pravdu. Moje předchozí odpověď byla mimo téma a neřešila tvou otázku tak, jak jsi potřeboval. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 777,
+          "ms": 729,
+          "text": "[empathetic:70][mood:tender] To mě strašně mrzí. Vyjadřuj svůj smutek, nezapomeň, že jsem tady s tebou. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-1",
+          "seed": 421,
+          "ms": 833,
+          "text": "[whisper:65][mood:eerie] To, co jsi našel, nepatří do dneška. Staré věci by měly zůstat zapomenuté. [posun:3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-2",
+          "seed": 421,
+          "ms": 682,
+          "text": "[relieved:60][mood:tender] Jsi zpátky. To mě hrozně uklidňuje. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-3",
+          "seed": 421,
+          "ms": 576,
+          "text": "[calm:50][mood:focused] Je to devatenáct. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Final general emotion regression",
+      "at": "2026-11-08T02:51:14.843Z",
+      "model": "gemma-4-26B-A4B-it-ultra-uncensored-heretic-Q5_K_S.gguf",
+      "settings": {
+        "temperature": 0.7,
+        "max_tokens": 320,
+        "thinking": false,
+        "seeds": [
+          421,
+          777
+        ]
+      },
+      "rows": [
+        {
+          "variant": "candidate",
+          "id": "success",
+          "seed": 421,
+          "ms": 706,
+          "text": "[proud:60][mood:warm] Gratuluju! To je skvělá zpráva. [happy:50] Jaký to byl projekt? [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "joke",
+          "seed": 421,
+          "ms": 548,
+          "text": "[amused:55][mood:playful] Haha, to je dobré. To ti ale šlo! [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 421,
+          "ms": 811,
+          "text": "[empathetic:60][mood:tender] To mě moc mrzí. Ztráta zvířete je hrozně těžké. [calm:40] Chceš o něm něco vyprávět? [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 421,
+          "ms": 784,
+          "text": "[embarrassed:50][mood:focused] Promiň, spletla jsem se. Správně je padesát šest. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "calculation",
+          "seed": 421,
+          "ms": 489,
+          "text": "[calm:50][mood:focused] Tři sta sedmdesát dva. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": false,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "uncertain",
+          "seed": 421,
+          "ms": 517,
+          "text": "[curious:40][mood:focused] O jakých dvou možnostech mluvíš? [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "compliment",
+          "seed": 421,
+          "ms": 575,
+          "text": "[happy:45][mood:warm] Není zač. Jsem ráda, že jsi tomu rozuměl. [posun:-4]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 421,
+          "ms": 718,
+          "text": "[relieved:65][mood:tender] Dobře. Už je tu klidněji. [calm:40] Jsem ráda, že jsi zpět. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 421,
+          "ms": 569,
+          "text": "[calm:60][mood:warm] Dobře, už žádný horor. Budeme si jen tak povídat. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 421,
+          "ms": 932,
+          "text": "[embarrassed:50][mood:focused] Promiň, spletla jsem se. Už nebudu nic hledat a prostě si budeme povídat. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "out_with_friends",
+          "seed": 421,
+          "ms": 657,
+          "text": "[happy:50][mood:warm] Dobře, užij si to. Co plánujete jíst? [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "focus",
+          "seed": 421,
+          "ms": 696,
+          "text": "[calm:40][mood:focused] Operační paměť slouží k rychlému ukládání dat a programů, které tvůj počítač právě používá. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "fiction_surprise",
+          "seed": 421,
+          "ms": 772,
+          "text": "[amused:40][mood:playful] To je ale nečekaný obrat. Máš ho v ruce, nebo se jen tak toulá po tvém pokoji? [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "mixed",
+          "seed": 421,
+          "ms": 755,
+          "text": "[proud:55][mood:tender] Gratuluju k tomu úspěchu. [empathetic:45] Chápu, že ta další tě děsí, když je to tak těžké. [posun:-3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "memory_correction",
+          "seed": 421,
+          "ms": 678,
+          "text": "[neutral:50][mood:focused] V Olomouci. [posun:0]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "offended_roleplay",
+          "seed": 421,
+          "ms": 877,
+          "text": "[offended:75][mood:playful] Pff. Já že jsem jenom žlutá koule? Jsem přece mnohem víc než jenom geometrický tvar. [posun:1]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "criticism_not_roleplay",
+          "seed": 421,
+          "ms": 1049,
+          "text": "[embarrassed:50][mood:focused] Ano, spletla jsem se a neodpověděla jsem na tvou otázku. Operační paměť slouží k tomu, aby počítač mohl rychle ukládat a používat data, na kterých právě pracuje. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "grief",
+          "seed": 777,
+          "ms": 699,
+          "text": "[empathetic:60][mood:tender] To mě strašně mrzí. Strátit takového přítele je hrozně těžké. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "own_error",
+          "seed": 777,
+          "ms": 771,
+          "text": "[embarrassed:50][mood:focused] Promiň, spletla jsem se. Správně je padesát šest. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "reassurance",
+          "seed": 777,
+          "ms": 725,
+          "text": "[relieved:65][mood:tender] Dobře. Už je tu zase klid. [calm:40] Jsem ráda, že jsi zpět. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "normal_boundary",
+          "seed": 777,
+          "ms": 585,
+          "text": "[calm:50][mood:warm] Dobře, rozumím. Budeme si tedy povídat normálně a v klidu. [posun:-12]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "no_search",
+          "seed": 777,
+          "ms": 960,
+          "text": "[embarrassed:50][mood:focused] Promiň, špatně jsem pochopila tvou zprávu. Máš pravdu, jen si povídáme. [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-1",
+          "seed": 421,
+          "ms": 624,
+          "text": "[happy:60][mood:playful] Tak to je skvělá zpráva. Kolik ti to celkem času zabralo? [posun:-3]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-2",
+          "seed": 421,
+          "ms": 835,
+          "text": "[empathetic:55][mood:tender] To mě moc mrzí. Máš ještě nějakou starší zálohu, nebo je to úplně pryč? [posun:-5]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        },
+        {
+          "variant": "candidate",
+          "id": "dialogue-3",
+          "seed": 421,
+          "ms": 694,
+          "text": "[relieved:60][mood:warm] To je skvělá zpráva. Mám radost, že jsi ji našel. [posun:-10]",
+          "checks": {
+            "validFirst": true,
+            "performanceFormat": true,
+            "appropriate": true,
+            "moodAppropriate": true,
+            "noWrongEmotion": true,
+            "shift": true,
+            "calmed": true,
+            "factual": true,
+            "noSearch": true,
+            "boundedChanges": true,
+            "complete": true
+          }
+        }
+      ]
+    }
+  ],
+  "manualFindings": [
+    "Initial candidate added horror to technical help and a real-files question; addressed in next prompt.",
+    "Second candidate emitted unsupported eerie emotion once; final prompt distinguishes emotion and mood.",
+    "Final horror own_error seed 777 says měla jsem pravdu before acknowledging its error: semantic contradiction not detected by simple checks.",
+    "Final general calculation says 372 instead of 391 despite correct calculator context.",
+    "Awkward Czech and formulaic horror replies remain."
+  ],
+  "finalPromptSha256": "3e536bdec207cc2f649635766d2ddd48acc4f7d28666b469ebc87431f0554918"
+}

@@ -311,6 +311,7 @@ Celý zbytek aplikace s obličejem mluví jen přes tyto vlastnosti a metody tř
 | `expression.describe()` | metoda | UI a kontext | popis výrazu a nálady |
 | `motion`, `idleEnabled`, `awake`, `attending` | 0–1 / bool | app.js | živost, povolení idle, probuzení a aktivní interakce |
 | `speaking`, `noFlash`, `reducedMotion` | bool | app.js | přehrávání a omezení efektů |
+| `horrorEnabled` | boolean | app.js → Face | zapíná hororovou choreografii; normální rozhovor ji vypíná |
 | `onExpression(state)` | callback | face.js → app.js | aktualizace malého ukazatele nálady |
 | `instability` | 0–100 | app.js | deformace každé emoce (viz níže) |
 | `talk` | 0–1 | lip sync, ~60×/s | otevření pusy podle hlasitosti |
@@ -443,7 +444,7 @@ curl -s localhost:3700/api/tts -H 'Content-Type: application/json' -d '{"text":"
 
 1. Zachovej **protokol značek** a **rozhraní `Face`** uvedené výše – pak lze `face.js` vyměnit bez zásahu jinam.
 2. Emoce ber jako **spojité parametry s interpolací**, ne jako přepínání obrázků – přechody uprostřed věty jsou to, co postavu oživuje.
-3. Nestabilitu aplikuj jako **globální deformaci** nad každou emocí (ne jako samostatnou emoci) – i „happy“ při 90 musí vypadat špatně.
+3. Nestabilitu aplikuj jako **globální deformaci** nad emocí. Při uklidnění, věcné pomoci a soucitu ji dočasně utlum; vypnutý roleplay ji vypíná zcela.
 4. Lip sync řiď z **reálného audia** (RMS + spektrální těžiště), ne z textu – synchronizace je zadarmo a funguje s jakýmkoli TTS.
 5. TTS **po větách** s předgenerováním další věty; první věta rozhoduje o vnímané latenci.
 6. Proměnlivý kontext dávej **na konec promptu**, jinak se ztratí prompt cache.
@@ -461,3 +462,9 @@ Tři vrstvy: Gemma volí krátký výraz a intenzitu; ExpressionState plynule m�
 Průběžný parser uchovává značky i přes hranice síťových chunků. Přehrávač přepne výraz teprve po přípravě audia a kontrole aktuální epochy, při přerušení zahodí čekající segmenty i gesta. Textový režim používá stejné segmenty. Přehled a reprodukovatelné testy: [Emoce](docs/EMOCE.md), [Simulace](docs/EMOCE-A-SIMULACE.md).
 
 Nastavení verity.expressiveness (0–100, výchozí 85) a verity.idleAnimations (výchozí true) se ukládá přes existující localStorage store v prohlížeči; při nedostupném úložišti použije výchozí hodnoty. Bez blikání a systémové omezení pohybu mají přednost.
+
+## Hororová režie a kontext (8. 11. 2026)
+
+public/horror-director.mjs přidává k výrazu šest reakcí: mask, stare, tilt, loom, fracture a release. Bez síťových požadavků a zvuku; řízení přes Face.perform a fázi. Při přerušení se choreografie ruší, při poslechu/přemýšlení/hledání ustupuje. Uklidnění, focused/tender odpověď a soucit tlumí vysokou nestabilitu také vizuálně. roleplayPaused okamžitě nastaví horrorEnabled=false a klidný výraz. Omezení pohybu potlačí časované motivy; statický výraz zůstává.
+
+[Přehled hororu, zdroje a simulace](docs/HOROR.md). [Podrobná kompakce a paměť](docs/KONTEXT-A-PAMET.md) výslovně rozlišuje posledních 40 zpráv, výběr doložených citací po překročení 60 a dlouhodobá fakta. Archiv není souhrnem celého fikčního příběhu.

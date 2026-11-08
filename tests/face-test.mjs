@@ -4,7 +4,7 @@ import {Face} from '../public/face.js';
 const catalog=JSON.parse(await fs.readFile(new URL('../public/emotions.json',import.meta.url)));
 const all=[];
 class Element {
- constructor(){this.attributes={};this.nodes=new Map();this.style={setProperty:(k,v)=>this.attributes[k]=v};all.push(this);}
+ constructor(){this.attributes={};this.dataset={};this.nodes=new Map();this.style={setProperty:(k,v)=>this.attributes[k]=v};all.push(this);}
  setAttribute(k,v){this.attributes[k]=String(v);assert.ok(!/NaN|Infinity/.test(String(v)),k+' '+v);}
  querySelector(k){if(!this.nodes.has(k))this.nodes.set(k,new Element());return this.nodes.get(k);}
  get firstElementChild(){return this.querySelector('iris');}
@@ -13,6 +13,7 @@ class Element {
 globalThis.document={documentElement:new Element()};
 globalThis.requestAnimationFrame=()=>{};
 const face=new Face(new Element(),{catalog});
+face.awake=true;
 const start=performance.now();let time=start;
 for(const emotion of Object.keys(catalog.emotions))for(const intensity of [0,.65,1])for(const instability of [0,100]){
  face.instability=instability;face.perform({emotion,intensity,mood:catalog.emotions[emotion].mood});face.speaking=true;
@@ -27,3 +28,6 @@ const second=new Face(new Element(),{catalog,ambient:false});assert.notEqual(fac
 console.log('PASS SVG poses for 29 emotions × 3 intensities × 2 roleplay levels, unique IDs, reduced motion and no-flash.');
 
 face.reducedMotion=false;face.perform({emotion:'happy',intensity:1});face.speaking=true;face.listening=false;const speakingWidth=face.target(performance.now()).w;face.listening=true;assert.equal(face.target(performance.now()).w,speakingWidth);
+
+for(const mode of ['mask','stare','tilt','loom','fracture']){face.horrorEnabled=true;face.awake=true;face.instability=95;face.reducedMotion=false;face.listening=false;face.speaking=false;face.horror.easeUntil=0;face.horror.start(mode,time);for(let i=0;i<60;i++){time+=16;face.frame(time);}assert.ok(face.horrorPose.amount>0,mode);assert.ok(+face.horrorShadow.attributes.opacity>0,mode);}
+face.horrorEnabled=false;face.frame(time+16);assert.equal(face.horrorPose.amount,0);assert.equal(face.horrorShadow.attributes.opacity,'0');

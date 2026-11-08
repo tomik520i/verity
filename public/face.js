@@ -1,5 +1,6 @@
-import {ExpressionState} from './expression-state.mjs?v=20261108-9';
-import {IdleDirector,reactionEnvelope} from './animation-director.mjs?v=20261108-9';
+import {ExpressionState} from './expression-state.mjs?v=20261108-10';
+import {IdleDirector,reactionEnvelope} from './animation-director.mjs?v=20261108-10';
+import {HorrorDirector} from './horror-director.mjs?v=20261108-10';
 const performanceTime = () => performance.now();
 let nextFaceId=0;
 // Obličej Verity: SVG koule, jejíž rysy se plynule interpolují mezi emocemi.
@@ -22,6 +23,7 @@ export class Face {
   constructor(host, {catalog, ambient=true} = {}) {
     this.catalog=catalog; this.expression=new ExpressionState(catalog);
     this.ambient=ambient; this.uid='vf'+(++nextFaceId)+'-';
+    this.horror=new HorrorDirector();this.horrorEnabled=true;this.horrorPose=this.horror.step(0,{enabled:false});
     this.idle=new IdleDirector(); this.awake=false; this.idleEnabled=true; this.attending=false;this.userSpeaking=false;
     this.motion=.85; this.reducedMotion=false; this.noFlash=false;
     this.gesture=null; this.nextGesture=0; this.nextGlance=0; this.glance={x:0,y:0};
@@ -62,6 +64,7 @@ export class Face {
   </defs>
   <ellipse class="floor-shadow" cx="200" cy="371" rx="69" ry="7" fill="#ffce4f" opacity=".10"/>
   <circle class="aura-ring" cx="200" cy="200" r="166" fill="none" stroke="#ffda71" stroke-width=".8" opacity=".13"/>
+  <g class="horror-shadow" opacity="0" fill="#250c0e"><path d="M170 166Q137 213 126 277L67 371Q110 363 148 311L145 393H255L251 310Q291 362 333 371L274 276Q262 213 230 166Z"/><ellipse cx="200" cy="112" rx="57" ry="84"/></g>
   <g class="rig">
     <circle cx="200" cy="200" r="150" fill="url(#vg-body)" class="sphere"/>
     <ellipse cx="160" cy="130" rx="90" ry="70" fill="url(#vg-shine)"/>
@@ -77,6 +80,7 @@ export class Face {
     <g class="sparks" fill="none" stroke="#fff3bc" stroke-width="2" stroke-linecap="round" opacity="0"><path d="M306 87v14m-7-7h14M85 152v10m-5-5h10M305 290v10m-5-5h10"/></g>
     <path class="mouth" stroke-linejoin="round" stroke-linecap="round"/>
     <g clip-path="url(#vg-mouth-clip)"><rect class="teeth" x="80" y="200" width="240" height="140" fill="url(#vg-teeth)"/></g>
+    <g class="horror-cracks" opacity="0" fill="none" stroke="#31130c" stroke-width="3"><path d="M143 61l-4 30 13 12-8 26M268 68l-8 32 15 19-6 26M67 210l25 8-4 14 20 10M324 231l-22 11 3 20-13 12M173 322l9 15-5 11"/></g>
     <g class="comic-marks" stroke-linecap="round" stroke-linejoin="round">
       <g class="sweat-mark" opacity="0"><path d="M319 110q-28 33-14 43q22 14 25-12q0-11-11-31Z" fill="#6bc6ed" stroke="#daf5ff" stroke-width="3"/><path d="M321 129q4 12-2 16" fill="none" stroke="#fff" stroke-width="3"/></g>
       <g class="anger-mark" opacity="0" stroke="#a32221" stroke-width="6" fill="none"><path d="M283 93q16 0 16 16m11-16q-16 0-16 16m-11 6q16 0 16-16m11 16q-16 0-16-16"/></g>
@@ -93,6 +97,7 @@ export class Face {
     this.eyes = [q('.eye.l'), q('.eye.r')];
     this.brows = [q('.brow.l'), q('.brow.r')];
     this.blushes = [q('.blush.l'), q('.blush.r')];
+    this.horrorShadow=q('.horror-shadow');this.horrorCracks=q('.horror-cracks');
     this.tearStreams=q('.tear-streams');this.cheeks=q('.puff-cheeks');this.sweat=q('.sweat-mark');this.anger=q('.anger-mark');this.shock=q('.shock-mark');this.question=q('.question-mark');this.blushLines=q('.blush-lines');this.sleepMark=q('.sleep-mark');
     this.tear=q('.tear');this.sparks=q('.sparks');this.shadow=q('.floor-shadow');this.aura=q('.aura-ring');
     this.mouth = q('.mouth'); this.mouthClip = q('.mouth-clip'); this.teeth = q('.teeth');
@@ -103,6 +108,7 @@ export class Face {
     const previous=this.expression.emotion;
     const profile=this.expression.set(performance,now);
     this.idle.cancel(now);
+    this.horror.perform(now,{enabled:this.horrorEnabled,level:this.instability,emotion:this.expression.emotion,mood:this.expression.mood});
     this.emotion=this.expression.emotion;
     // Gesto patří právě přehrávané větě, ne předem vygenerovanému textu.
     if(now>=this.nextGesture || previous!==this.expression.emotion) {
@@ -110,13 +116,14 @@ export class Face {
       this.nextGesture=now+2200;
       this.pop=this.expression.intensity*.45;
     }
+    if(this.horror.current&&this.horror.current.mode!=='release'){this.gesture=null;this.pop=0;}
     this.onExpression?.(this.expression.describe());
   }
   setEmotion(emotion) {
     if(!Object.hasOwn(this.catalog.emotions,emotion)||emotion===this.emotion)return;
     this.perform({emotion});
   }
-  cancelGesture() { this.gesture=null; this.pop=0; }
+  cancelGesture() { this.gesture=null; this.pop=0; this.horror.clear(performanceTime()); }
   lookAt(x,y) { this.look.x=clamp(x,-1,1);this.look.y=clamp(y,-1,1); }
   gesturePose(now) {
     const out={x:0,y:0,tilt:0,scale:0,wink:0};
@@ -148,12 +155,14 @@ export class Face {
 
   target(now) {
     const t = this.expression.pose(BASE,now,{active:this.speaking||this.talk>.03,expressiveness:this.motion});
-    const inst = this.instability / 100;
+    const horror=this.horrorPose;
+    const visualLevel=(this.horrorEnabled?this.instability:0)*(1-horror.relax*.9);
+    const inst = visualLevel / 100;
     // nestabilita deformuje každou emoci
     t.w += inst * 34; t.curve += inst * 12;
-    t.red = Math.max(t.red, clamp((this.instability - 45) / 55, 0, 1));
-    t.teeth = Math.max(t.teeth, clamp((this.instability - 70) / 30, 0, 1));
-    t.shake += clamp((this.instability - 60) / 40, 0, 1) * 0.8;
+    t.red = Math.max(t.red, clamp((visualLevel - 55) / 45, 0, 1)*.65);
+    t.teeth = Math.max(t.teeth, clamp((visualLevel - 70) / 30, 0, 1));
+    t.shake += clamp((visualLevel - 75) / 25, 0, 1) * 0.25;
     if (this.thinking) { t.lookX = Math.sin(now / 700) * 6; t.lookY = -7; t.w *= 0.6; t.curve *= 0.6; t.open = 0; }
     if (this.dance > 0.05) t.curve += 6 * this.dance;   // při hudbě se jen trochu víc usmívá
     if (this.listening && !this.speaking && !this.thinking && !this.searching) {
@@ -162,35 +171,45 @@ export class Face {
       t.open = Math.max(t.open, 3); t.w *= 0.75; t.bob *= 0.3; t.glow += this.hear * 0.6;
     }
     if (this.searching) { t.lookX = Math.sin(now / 260) * 10; t.lookY = -3; t.erx -= 2; }
+    const mask=clamp(horror.amount*1.6,0,1);
+    t.curve+=horror.smile;t.w+=horror.smile*.65;t.mouthBias+=horror.asym;
+    t.erx*=horror.eyeScale;t.ery*=1-mask*.15;t.browAsym+=horror.asym*.5;
+    t.lookX*=1-horror.still;t.lookY*=1-horror.still;t.bob*=1-horror.still;
+    // The cheerful eyes disappear before the smile does.
+    for(const key of ['starEye','heartEye','smileEye','flatEye','sparkle','sweat','anger','question','shock'])t[key]*=1-mask;
+    if(horror.mode==='fracture'){t.teeth=Math.max(t.teeth,horror.amount);t.open=Math.max(t.open,horror.amount*18);}
+    if(!this.horrorEnabled){t.red=0;t.teeth=0;t.shake=0;}
     return t;
   }
 
   frame(now) {
     const dt = Math.min(0.05, (now - (this.last || now)) / 1000); this.last = now;
     this.expression.step(dt);
-    const idle=this.idle.step(now,{active:this.speaking||this.talk>.03||this.thinking||this.searching||this.userSpeaking||(this.listening&&this.hear>.08)||this.attending||!!this.gesture,enabled:this.awake&&this.idleEnabled&&!this.reducedMotion,mood:this.expression.mood,motion:this.motion,listening:this.listening});
+    this.horrorPose=this.horror.step(now,{enabled:this.horrorEnabled,awake:this.awake,level:this.instability,emotion:this.expression.emotion,mood:this.expression.mood,busy:this.userSpeaking||(this.listening&&this.hear>.08)||this.attending||this.thinking||this.searching,speaking:this.speaking||this.talk>.03,idleEnabled:this.idleEnabled,reducedMotion:this.reducedMotion,motion:this.motion});
+    const horror=this.horrorPose;
+    const idle=this.idle.step(now,{active:this.speaking||this.talk>.03||this.thinking||this.searching||this.userSpeaking||(this.listening&&this.hear>.08)||this.attending||!!this.gesture||horror.amount>.02||horror.tension>.35,enabled:this.awake&&this.idleEnabled&&!this.reducedMotion,mood:this.expression.mood,motion:this.motion,listening:this.listening});
     const t = this.target(now);
     t.lookX+=idle.lookX;t.lookY+=idle.lookY;t.open+=idle.mouth;t.smileEye+=idle.smile;
     const k = 1 - Math.pow(0.0015, dt);      // plynulý přechod
     for (const key in t) this.p[key] = lerp(this.p[key], t[key], k);
     const p = this.p;
-    const movement=this.reducedMotion?0:this.motion;
+    const movement=this.reducedMotion?0:this.motion*(1-horror.still);
     const gesture=this.gesturePose(now);
     // Pomalejší drobné přesuny pohledu, žádný náhodný třes očí každý snímek.
     if(now>this.nextGlance){this.glance={x:(Math.random()-.5)*3,y:(Math.random()-.5)*2};this.nextGlance=now+2200+Math.random()*3400;}
-    const focusX=p.lookX+this.look.x*9+this.glance.x*movement;
-    const focusY=p.lookY+this.look.y*7+this.glance.y*movement;
+    const focusX=(p.lookX+this.look.x*9+this.glance.x*movement)*(1-horror.still);
+    const focusY=(p.lookY+this.look.y*7+this.glance.y*movement)*(1-horror.still);
     const eyeK=1-Math.exp(-dt*13);this.gaze.x+=(focusX-this.gaze.x)*eyeK;this.gaze.y+=(focusY-this.gaze.y)*eyeK;
     this.speechNod+=(Math.max(0,this.talk-this.lastTalk)-this.speechNod)*.15;this.lastTalk=this.talk;
 
     // mrkání (při vysoké nestabilitě skoro vůbec – zírá)
-    if (now > this.nextBlink) {
+    if (now > this.nextBlink && horror.still<.35) {
       this.blink = 1;
       const rare = 1 + this.instability / 12;
       this.nextBlink = now + (1800 + Math.random() * 4200) * rare;
     }
     this.blink = Math.max(0, this.blink - dt * 7);
-    const lid = (1 - Math.sin(this.blink * Math.PI) * 0.92)*idle.lid;
+    const lid = lerp((1 - Math.sin(this.blink * Math.PI) * 0.92)*idle.lid,1,horror.still);
 
     // celkový pohyb
     const shake = this.noFlash ? 0 : p.shake * 1.2 * movement;
@@ -204,9 +223,9 @@ export class Face {
     const lift = -Math.abs(Math.sin(ph)) * 5 * dn;            // lehké nadzvednutí max 5 px
     const squash = 1 + Math.sin(this.pop * Math.PI) * .13 * movement;
     const breathe = 1 + (Math.sin(now / 1900) * .008 + this.talk * .009) * movement;
-    const s = p.scale * (breathe+gesture.scale);
+    const s = p.scale * (breathe+gesture.scale+horror.scale);
     this.rig.setAttribute('transform',
-      `translate(${200 + jx + Math.sin(ph) * 4 * dn + gesture.x + idle.x} ${200 + bob * (1 - dn) + jy + lift + gesture.y + idle.y - this.speechNod*35*movement}) rotate(${p.tilt + Math.sin(now / 3100) * 1.4 * movement + sway + gesture.tilt + idle.tilt}) scale(${s * squash * idle.sx} ${s / squash * idle.sy}) translate(-200 -200)`);
+      `translate(${200 + jx + Math.sin(ph) * 4 * dn + gesture.x + idle.x} ${200 + bob * (1 - dn) + jy + lift + gesture.y + idle.y - this.speechNod*35*movement}) rotate(${p.tilt + Math.sin(now / 3100) * 1.4 * movement + sway + gesture.tilt + idle.tilt + horror.tilt}) scale(${s * squash * idle.sx} ${s / squash * idle.sy}) translate(-200 -200)`);
 
     // barvy těla: žlutá → tmavě oranžová/rudá
     const dark = clamp(p.red * 0.7 + p.dim, 0, 1);
@@ -214,7 +233,11 @@ export class Face {
     this.stops.forEach((st, i) => st.setAttribute('stop-color', mix(pal[i][0], pal[i][1], dark)));
     const moodColor=this.catalog.moods[this.expression.mood].color;
     const glowCol = mix(mix('#ffcf1f',moodColor,.32), '#ff1e1e', p.red);
-    this.shadow.setAttribute('rx',Math.max(35,69-bob*.7));
+    this.horrorShadow.setAttribute('opacity',horror.shadow*.55);
+    this.horrorShadow.setAttribute('transform','translate(0 '+(-horror.shadow*12)+')');
+    this.horrorCracks.setAttribute('opacity',horror.cracks*.85);
+    this.host.dataset.horror=horror.mode||'quiet';
+    this.shadow.setAttribute('rx',Math.max(35,69-bob*.7+horror.shadow*75));
     this.shadow.setAttribute('opacity',(.07+p.glow*.025).toFixed(3));
     this.aura.setAttribute('stroke',glowCol);
     this.aura.setAttribute('opacity',(.07+p.glow*.055).toFixed(3));

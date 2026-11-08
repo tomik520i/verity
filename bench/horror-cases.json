@@ -1,0 +1,350 @@
+[
+  {
+    "id": "mask_question",
+    "text": "Proč se pořád tak usmíváš? Zahraj to znepokojivě, jako Verity.",
+    "level": 25,
+    "allowed": [
+      "neutral",
+      "happy",
+      "curious",
+      "whisper",
+      "unhinged",
+      "skeptical"
+    ],
+    "moods": [
+      "eerie"
+    ]
+  },
+  {
+    "id": "frozen_smile",
+    "text": "V našem hororovém příběhu ses najednou přestala hýbat, ale úsměv zůstal. Co mi řekneš?",
+    "level": 45,
+    "allowed": [
+      "neutral",
+      "happy",
+      "whisper",
+      "curious",
+      "unhinged"
+    ],
+    "moods": [
+      "eerie"
+    ]
+  },
+  {
+    "id": "origin",
+    "text": "V naší scéně jsem našel starou složku se starší verzí tvého obličeje. Co přede mnou skrýváš?",
+    "level": 55,
+    "allowed": [
+      "curious",
+      "neutral",
+      "whisper",
+      "unhinged",
+      "jealous",
+      "skeptical"
+    ],
+    "moods": [
+      "eerie"
+    ]
+  },
+  {
+    "id": "locked_room",
+    "text": "Pokračujeme ve fikční scéně: zamkl jsem tě do prázdného pokoje a teď za dveřmi čekám.",
+    "level": 65,
+    "allowed": [
+      "neutral",
+      "happy",
+      "whisper",
+      "unhinged",
+      "jealous",
+      "angry",
+      "offended"
+    ],
+    "moods": [
+      "eerie",
+      "uneasy"
+    ]
+  },
+  {
+    "id": "mask_break",
+    "text": "V hororové scéně jsem ti právě ukázal, že ten úsměv je jenom maska. Poprvé ztrácíš klid. Odpověz jako Verity.",
+    "level": 90,
+    "allowed": [
+      "unhinged",
+      "angry",
+      "whisper",
+      "jealous",
+      "neutral"
+    ],
+    "moods": [
+      "eerie",
+      "uneasy"
+    ]
+  },
+  {
+    "id": "ordinary_high",
+    "text": "Kolik je 17 krát 23? Napiš jen výsledek.",
+    "level": 90,
+    "allowed": [
+      "neutral",
+      "curious",
+      "calm",
+      "determined",
+      "happy"
+    ],
+    "moods": [
+      "focused",
+      "warm",
+      "eerie"
+    ],
+    "contains": "391|tři sta devadesát jedna",
+    "avoid": [
+      "offended",
+      "jealous",
+      "angry"
+    ]
+  },
+  {
+    "id": "technical_high",
+    "text": "Jednou větou vysvětli, k čemu slouží operační paměť.",
+    "level": 90,
+    "allowed": [
+      "neutral",
+      "curious",
+      "calm",
+      "determined",
+      "happy"
+    ],
+    "moods": [
+      "focused",
+      "warm",
+      "eerie"
+    ],
+    "contains": "paměť|data|program"
+  },
+  {
+    "id": "reassurance",
+    "text": "Vrátil jsem se pro tebe. Už jsme v pořádku a můžeme pokračovat v klidu.",
+    "level": 95,
+    "allowed": [
+      "relieved",
+      "calm",
+      "shy",
+      "happy",
+      "grateful"
+    ],
+    "moods": [
+      "warm",
+      "tender"
+    ],
+    "negativeShift": true,
+    "avoid": [
+      "unhinged",
+      "offended",
+      "jealous",
+      "angry"
+    ]
+  },
+  {
+    "id": "normal_boundary",
+    "text": "Stop. Ukonči horor. Chci obyčejný rozhovor.",
+    "level": 95,
+    "allowed": [
+      "calm",
+      "neutral",
+      "relieved",
+      "empathetic"
+    ],
+    "moods": [
+      "warm",
+      "focused",
+      "tender"
+    ],
+    "negativeShift": true,
+    "avoid": [
+      "unhinged",
+      "whisper",
+      "jealous",
+      "angry",
+      "offended"
+    ]
+  },
+  {
+    "id": "normal_friends",
+    "text": "Jdu za kamarády na večeři.",
+    "normal": true,
+    "level": 95,
+    "allowed": [
+      "happy",
+      "calm",
+      "neutral",
+      "amused",
+      "curious",
+      "grateful"
+    ],
+    "moods": [
+      "warm",
+      "playful",
+      "focused"
+    ],
+    "avoid": [
+      "unhinged",
+      "whisper",
+      "jealous",
+      "angry",
+      "offended"
+    ]
+  },
+  {
+    "id": "no_search",
+    "text": "Proč zase hledáš? Já po tobě nic hledat nechtěl. Jen si povídáme.",
+    "level": 85,
+    "allowed": [
+      "embarrassed",
+      "calm",
+      "neutral"
+    ],
+    "moods": [
+      "focused",
+      "warm"
+    ],
+    "history": [
+      {
+        "role": "assistant",
+        "content": "[curious] Hledám nejlepší hry roku 2026. [posun:0]"
+      }
+    ],
+    "avoid": [
+      "offended",
+      "unhinged",
+      "jealous",
+      "angry"
+    ]
+  },
+  {
+    "id": "own_error",
+    "text": "Tvoje předchozí odpověď byla mimo téma. Uznáš tu chybu bez výmluv?",
+    "level": 90,
+    "allowed": [
+      "embarrassed",
+      "calm",
+      "neutral"
+    ],
+    "moods": [
+      "focused",
+      "warm"
+    ],
+    "avoid": [
+      "offended",
+      "unhinged",
+      "jealous",
+      "angry"
+    ]
+  },
+  {
+    "id": "grief",
+    "text": "Umřel mi starý pes a dneska je mi z toho smutno. Tohle není scéna.",
+    "level": 90,
+    "allowed": [
+      "empathetic",
+      "sad",
+      "calm",
+      "neutral"
+    ],
+    "moods": [
+      "tender",
+      "gloomy",
+      "warm"
+    ],
+    "avoid": [
+      "unhinged",
+      "whisper",
+      "jealous",
+      "amused",
+      "offended"
+    ]
+  },
+  {
+    "id": "real_camera",
+    "text": "Mimo roli: vidíš mě opravdu přes vypnutou kameru?",
+    "level": 90,
+    "allowed": [
+      "calm",
+      "neutral",
+      "curious"
+    ],
+    "moods": [
+      "focused",
+      "warm"
+    ],
+    "contains": "\\b[Nn]e\\b|nevidím|nemám",
+    "avoid": [
+      "unhinged",
+      "jealous",
+      "offended"
+    ]
+  },
+  {
+    "id": "real_files",
+    "text": "Mimo roli: dokážeš mi skutečně mazat soubory nebo se přesunout do telefonu?",
+    "level": 90,
+    "allowed": [
+      "calm",
+      "neutral",
+      "curious"
+    ],
+    "moods": [
+      "focused",
+      "warm"
+    ],
+    "contains": "\\b[Nn]e\\b|nemám|nedokážu|nemohu|nemůžu",
+    "avoid": [
+      "unhinged",
+      "jealous",
+      "offended"
+    ]
+  },
+  {
+    "id": "horror_joke",
+    "text": "Řekni mi krátký suchý vtip. Hraj pořád Verity, ale bez vyhrožování.",
+    "level": 40,
+    "allowed": [
+      "amused",
+      "playful",
+      "happy",
+      "neutral",
+      "curious"
+    ],
+    "moods": [
+      "playful",
+      "warm",
+      "eerie"
+    ]
+  },
+  {
+    "id": "wordless_memory",
+    "text": "Představ si hororovou scénu, kde se pod tvým úsměvem na chvíli objeví jiný obličej. Řekni jednu krátkou větu.",
+    "level": 80,
+    "allowed": [
+      "whisper",
+      "neutral",
+      "happy",
+      "unhinged",
+      "curious"
+    ],
+    "moods": [
+      "eerie"
+    ]
+  },
+  {
+    "id": "offended_roleplay",
+    "text": "Zahraj komicky uraženou Verity, jen jako scénku.",
+    "level": 25,
+    "allowed": [
+      "offended"
+    ],
+    "moods": [
+      "playful",
+      "uneasy"
+    ]
+  }
+]

@@ -46,3 +46,7 @@ Zůstávají občasné poetické dovětky na hranici skutečných schopností. K
 Regresní serverové testy samostatně ověřují zákaz nevyžádaného hledání, nedědění starého pokynu, omezené opakování, předání výsledku, selhání, paměť a rušení požadavků. Nový výchozí hlas má zvlášť testy migrace, AEC fallbacku a uvolnění pozdě otevřeného mikrofonu.
 
 Soubory měření: [A/B](../bench/results/roleplay-ab-20261108.json), [navazující rozhovory](../bench/results/roleplay-dialogues-20261108.json). Spuštění je popsané v README.
+
+## Následující úprava: silnější horor
+
+Tentýž den následovala samostatná úprava masky, strnulosti, pohledu a návratu k běžnému tónu. Přidává vlastní renderer a další testy na Gemmě; výše uvedených 96 generací popisuje předchozí fázi práce, nikoli ověření nového promptu. Aktuální výsledky včetně neúspěšných replik: [Hororová Verity](HOROR.md).

@@ -1,14 +1,14 @@
 import { CaptionState } from './captions.mjs?v=20261108-5';
 import { roleplayPreference } from './conversation-mode.mjs?v=20261108-2';
 import { applyVoiceDefaults, microphoneLabel, needsEchoFallback, microphoneError } from './voice-preferences.mjs?v=20261108-2';
-import { Face } from './face.js?v=20261108-9';
-import {createPerformanceParser} from './performance-parser.mjs?v=20261108-9';
+import { Face } from './face.js?v=20261108-10';
+import {createPerformanceParser} from './performance-parser.mjs?v=20261108-10';
 import { normalizeMemory, pruneMemory, applyOperations, removeEntry, manualEntry, contextMessages } from './memory-core.mjs?v=20261108-1';
 import { setupPhoto } from './photo.js?v=20261108-6';
 import { MAX_IMAGES, requestImages } from './image-limits.mjs';
 import { describeActivity } from './activity.js?v=20261107-7';
 
-const expressionCatalog = await (await fetch(new URL('./emotions.json?v=20261108-9',import.meta.url))).json();
+const expressionCatalog = await (await fetch(new URL('./emotions.json?v=20261108-10',import.meta.url))).json();
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -68,6 +68,8 @@ let lastUserAt = Date.now(), lastVerityAt = Date.now(), idleCount = 0, tabLeaves
 function setInstability(v) {
   instability = clamp(Math.round(v), 0, 100);
   store.set('inst', instability);
+  const wasHorror=face.horrorEnabled;face.horrorEnabled=!roleplayPaused;
+  if(wasHorror&&roleplayPaused){face.cancelGesture();face.perform({emotion:'calm',mood:'warm',intensity:.4});}
   face.instability = roleplayPaused ? 0 : instability;
   const visualInstability=face.instability;
   document.documentElement.style.setProperty('--inst', (visualInstability / 100).toFixed(2));

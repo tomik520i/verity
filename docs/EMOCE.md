@@ -89,3 +89,7 @@ Volba Bez blikání potlačuje rychlé světelné a glitch efekty. Systémové o
 - public/performance-parser.mjs: zpracování značek ze streamu; starý formát [happy] stále funguje.
 
 Hlas zůstává stejný OmniVoice checkpoint. Emoce ovlivňují tempo a případnou nakonfigurovanou hlasovou referenci; nejde o nový model schopný libovolné anime intonace.
+
+## Hororová vrstva
+
+Nad těmito 29 emocemi funguje šest krátkých hororových reakcí. Nejsou to další názvy značek: řídí je výraz, rozpoložení a nestabilita. Vzhled, spouštění, podklady z předlohy a výsledky Gemmy jsou v samostatném **[seznamu hororových reakcí](HOROR.md)**.
