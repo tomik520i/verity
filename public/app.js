@@ -933,7 +933,7 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => store.set('lastSeen', Date.now()), 30000);
 window.addEventListener('beforeunload', e => {
   store.set('lastSeen', Date.now());
-  if (awake && instability > 65) { e.preventDefault(); e.returnValue = ''; }
+  if (awake && !liveMode && instability > 65) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // ── glitch ───────────────────────────────────────────────────────────────────
