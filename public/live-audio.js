@@ -54,8 +54,8 @@ const timeoutSignal = ms => (AbortSignal.timeout ? AbortSignal.timeout(ms) : (()
 export class LiveTranscriber {
   constructor({ onText = () => {}, onState = () => {}, onLevel = () => {}, onPause = () => {},
     endpoint = 'api/stt?live=1', rate = 16000, pauseSeconds = 2.2, snapshotMs = 1700, snapshotSeconds = 1.45,
-    getThreshold = () => null, suppressInput = () => false } = {}) {
-    Object.assign(this, { onText, onState, onLevel, onPause, endpoint, rate, pauseSeconds, snapshotMs, snapshotSeconds, getThreshold, suppressInput });
+    getThreshold = () => null, suppressInput = () => false, monitorOnly = false } = {}) {
+    Object.assign(this, { onText, onState, onLevel, onPause, endpoint, rate, pauseSeconds, snapshotMs, snapshotSeconds, getThreshold, suppressInput, monitorOnly });
     this.segments = []; this.current = null;
     this.pre = []; this.preSize = 0;          // ~0,35 s (se Silero 0,8 s – ohlásí řeč o 0,2–0,4 s později) před začátkem řeči, aby se neukrojilo první slovo
     this.elapsed = 0; this.lastSpeechAt = 0; this.speechSeconds = 0;
@@ -69,7 +69,7 @@ export class LiveTranscriber {
     this.inputSuppressed = false; this.inputRevision = 0; this.vadNeedsReset = false;
   }
 
-  startTimer() { this.timer = setInterval(() => this.pump().catch(() => {}), this.snapshotMs); }
+  startTimer() { if (this.monitorOnly) return; this.timer = setInterval(() => this.pump().catch(() => {}), this.snapshotMs); }
 
   // Detekce řeči (VAD):
   //  - úroveň bloku v dBFS, šum pozadí se průběžně měří jen mimo řeč;
@@ -163,6 +163,9 @@ export class LiveTranscriber {
       this.onState('Mikrofon nic nezachytává – zkontroluj, jestli je v prohlížeči vybraný ten správný.', true);
     }
 
+    // Místní test končí detekcí: žádné uchování PCM, přepis ani odeslání tahu.
+    if (this.monitorOnly) return;
+
     // pauza po řeči (pro režim „odeslat po pauze“): ≥ 0,3 s řeči a pak pauseSeconds ticha
     if (!this.paused && !this.speaking && this.speechSeconds >= 0.3 && this.elapsed - this.lastSpeechAt >= this.pauseSeconds) {
       this.paused = true; this.onPause();
@@ -202,10 +205,11 @@ export class LiveTranscriber {
     return out;
   }
 
-  publish() { this.onText(joinTranscript(this.segments), { partial: this.segments.some(s => !s.done), seconds: this.elapsed }); }
+  publish() { if (this.monitorOnly) return; this.onText(joinTranscript(this.segments), { partial: this.segments.some(s => !s.done), seconds: this.elapsed }); }
 
   // Nejvýš jeden HTTP přepis najednou; průběžný snímek jen když přibylo ≥ 1,45 s zvuku.
   async pump() {
+    if (this.monitorOnly) return;
     if (this.pending) return this.pending;
     if (this.cancelled) return;
     const seg = this.segments.find(s => !s.done && (s.final || s.count - s.sent >= this.rate * this.snapshotSeconds));
@@ -255,6 +259,7 @@ export class LiveTranscriber {
 
   async finish() {
     this.closed = true; clearInterval(this.timer);
+    if (this.monitorOnly) return '';
     if (this.current) { this.current.final = true; this.current = null; }
     if (this.pending) await this.pending.catch(() => {});
     while (this.segments.some(s => !s.done)) await this.pump();
@@ -270,7 +275,8 @@ export class LiveTranscriber {
   ambience() { return this.noiseDb < -58 ? 'ticho' : this.noiseDb < -45 ? 'mírný ruch' : 'hluk'; }
 }
 
-export async function startMicrophone({ vad = true, debug = false, audioContext = null, echoCancellation = false, onEnded = () => {}, ...options } = {}) {
+export async function startMicrophone({ vad = true, debug = false, monitorOnly = false, audioContext = null, echoCancellation = false, onEnded = () => {}, ...options } = {}) {
+  if (monitorOnly) debug = false;
   const vadLoading = vad ? import('./vad.js?v=20261107-2').then(m => m.SileroVad.create())
     .catch(e => { console.warn('Silero VAD se nenačetl, jedu podle hlasitosti:', e); return null; }) : null;
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
@@ -292,7 +298,7 @@ export async function startMicrophone({ vad = true, debug = false, audioContext 
     const capture = new AudioWorkletNode(context, 'pcm-capture', { processorOptions: { outRate: rate, diagnostic: debug } });
     const mute = context.createGain(); mute.gain.value = 0;   // mikrofon se nepřehrává zpět
     input.connect(capture); capture.connect(mute); mute.connect(context.destination);
-    const engine = new LiveTranscriber({ ...options, rate, ...(debug ? { endpoint: 'api/stt?live=1&debug=1' } : {}) });
+    const engine = new LiveTranscriber({ ...options, rate, monitorOnly, ...(debug ? { endpoint: 'api/stt?live=1&debug=1' } : {}) });
     engine.inputRate = context.sampleRate;
     const settings = stream.getAudioTracks?.()[0]?.getSettings?.() || {};
     engine.echoCancellation = settings.echoCancellation ?? null;
@@ -326,7 +332,7 @@ export async function startMicrophone({ vad = true, debug = false, audioContext 
     let ended = false, stopPromise = null, processingError = null;
     capture.port.onmessage = event => {
       if (event.data?.flushed) { flushDone?.(); return; }
-      if (event.data?.raw) { rawChunks.push(event.data.raw); rawCount += event.data.raw.length; return; }
+      if (event.data?.raw) { if (!debug) return; rawChunks.push(event.data.raw); rawCount += event.data.raw.length; return; }
       const block = new Float32Array(event.data);
       const capturedSuppressed = engine.suppressInput();
       queued++;

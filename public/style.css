@@ -360,3 +360,67 @@ button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-v
   .voice-first .wake-inner { gap:4px; }
 }
 @media(prefers-reduced-motion:reduce) { .voice-controls .mic { transition:none; } }
+
+/* Oba směry rozhovoru jsou stále čitelné, i když je historie zavřená. */
+body.voice-first { grid-template-rows:auto minmax(0,1fr) auto auto auto auto; }
+.voice-first .face-wrap { width:min(80cqw,calc(100cqh - 16px),550px); }
+.conversation-captions { width:min(760px,calc(100% - 40px)); margin:0 auto; border:1px solid #fff1; border-radius:16px; background:#11100d80; padding:3px 16px; }
+.caption-row { display:grid; grid-template-columns:66px minmax(0,1fr); gap:12px; align-items:start; padding:12px 0; }
+.caption-row + .caption-row { border-top:1px solid #ffffff0c; }
+.caption-speaker { color:#d4bc62; font-size:10px; letter-spacing:.09em; padding-top:4px; line-height:1.5; }
+.caption-user .caption-speaker { color:#aaa795; letter-spacing:.02em; }
+.voice-first .conversation-captions .subtitle,
+.voice-first .conversation-captions .voice-draft {
+  width:100%; max-width:none; text-align:left; margin:0; padding:0;
+  min-height:1.5em; max-height:4.5em; overflow:auto; overscroll-behavior:contain;
+  font-size:clamp(14px,1.4vw,17px); line-height:1.5; white-space:pre-wrap;
+  overflow-wrap:anywhere; scrollbar-width:thin; scrollbar-color:#685c32 transparent;
+}
+.voice-first .conversation-captions .subtitle { color:#f3ecd7; min-height:3em; }
+.voice-first .conversation-captions .voice-draft { color:#c9c9be; max-height:3em; font-size:13px; }
+.conversation-captions .placeholder { color:#827e70 !important; }
+@media(min-width:1150px) {
+  .voice-first.chat-open .conversation-captions { width:min(640px,calc(100% - 570px)); margin-left:28px; margin-right:auto; }
+}
+@media(max-width:600px) {
+  .voice-first .face-wrap { width:min(88cqw,calc(100cqh - 12px),440px); }
+  .conversation-captions { width:calc(100% - 28px); border-radius:12px; padding:2px 12px; }
+  .caption-row { grid-template-columns:48px minmax(0,1fr); gap:9px; padding:9px 0; }
+  .caption-speaker { font-size:9px; letter-spacing:.04em; }
+  .voice-first .conversation-captions .subtitle { font-size:14px; max-height:4.5em; }
+  .voice-first .conversation-captions .voice-draft { font-size:12px; }
+}
+@media(max-height:570px) {
+  .caption-row { padding:6px 0; }
+  .voice-first .conversation-captions .subtitle { min-height:1.5em; max-height:3em; font-size:13px; }
+  .voice-first .conversation-captions .voice-draft { max-height:1.5em; font-size:12px; }
+  .voice-first .face-wrap { width:min(70cqw,calc(100cqh - 10px),440px); }
+}
+
+.mic-test-panel { padding:14px; background:#ffffff04; border:1px solid #ffffff10; border-radius:12px; }
+.mic-test-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.mic-test-heading strong { font-size:12px; font-weight:500; color:var(--fg); }
+#mic-test-state { font-size:10px; padding:4px 8px; border-radius:30px; background:#ffffff0b; color:#c4bfae; }
+#mic-test-state[data-signal=speech] { background:#267e3b40; color:#85ed9e; }
+#mic-test-state[data-signal=sound] { background:#8f702030; color:#ecd27d; }
+.mic-test-note, #mic-test-status { font-size:10px; line-height:1.6; color:#a19a86; margin:10px 0; }
+#mic-test-status { min-height:3.2em; }
+#mic-test-status.err { color:#ff9696; }
+.mic-test-readings { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:10px; color:#97917e; }
+.mic-test-readings output { display:block; color:#e1d7b8; font-size:13px; font-variant-numeric:tabular-nums; }
+.menu #mic-test-retry { font-size:11px; }
+.menu #mic-test-retry:disabled { opacity:.5; cursor:wait; }
+.menu .vad { padding:12px 0; }
+.menu .vad-bar { height:12px; }
+.menu .vad.speaking #vad-fill { background:#62d983; box-shadow:0 0 12px #62d98344; }
+
+/* Více obrázků v jedné zprávě */
+.attach { display:block; padding:0 16px; }
+.attach-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.attach-list { display:flex; gap:8px; overflow-x:auto; padding:4px 0; max-height:108px; }
+.attach-item { position:relative; flex:0 0 76px; }
+.attach-item img { width:76px; height:76px; }
+.attach-item span { position:absolute; bottom:5px; left:4px; background:#141216dd; color:#fff; padding:0 5px; border-radius:3px; }
+.attach-item .icon { position:absolute; right:0; top:0; width:24px; height:24px; background:#141216ee; color:#fff; font-size:20px; }
+.message-images { display:flex; gap:6px; flex-wrap:wrap; }
+.message-images .thumb { width:76px; height:76px; object-fit:cover; }

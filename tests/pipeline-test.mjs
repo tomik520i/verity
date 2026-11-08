@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),temp=await fs.mkdtemp(path.join((await import('node:os')).tmpdir(),'verity-pipeline-'));
 await fs.mkdir(temp,{recursive:true});
 await fs.mkdir(path.join(temp,'public'),{recursive:true});
-for(const f of ['server.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs'])await fs.copyFile(path.join(root,f),path.join(temp,f));
+for(const f of ['server.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs','public/image-limits.mjs'])await fs.copyFile(path.join(root,f),path.join(temp,f));
 const python=process.argv[2];
 await fs.writeFile(path.join(temp,'search.py'),"import json,sys,os,time\nq=sys.argv[1]\nwith open(os.path.join(os.path.dirname(__file__),'calls.txt'),'a') as f:f.write('search\\n')\nif 'CEKEJ' in q:time.sleep(10)\nprint(json.dumps({'results':[],'error':'timeout'} if 'SELHANI' in q else {'results':[{'title':'Fixture','url':'https://fixture.invalid','snippet':'ověřený výsledek'}]}))\n");
 let replies=[],calls=[],closed=0;
@@ -27,7 +27,7 @@ const child=spawn(process.execPath,[path.join(temp,'server.js')],{windowsHide:tr
 child.stdout.on('data',c=>logs+=c);child.stderr.on('data',c=>logs+=c);
 const until=async fn=>{const end=Date.now()+6000;while(!fn()&&Date.now()<end)await sleep(30);assert.ok(fn(),logs)};
 const searchN=async()=>((await fs.readFile(path.join(temp,'calls.txt'),'utf8').catch(()=>'' )).match(/search/g)||[]).length;
-const chat=async (text,history=[],state={},image=null)=>{const r=await fetch('http://127.0.0.1:8796/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[...history,{role:'user',content:text}],thinking:'off',state,image})});return (await r.text()).split('\n').filter(l=>l.startsWith('data:')).map(l=>JSON.parse(l.slice(5)));};
+const chat=async (text,history=[],state={},image=null)=>{const r=await fetch('http://127.0.0.1:8796/api/chat',{method:'POST',headers:{'Content-Type':'application/json',...(Array.isArray(image)?{'X-Forwarded-For':'192.0.2.10'}:{})},body:JSON.stringify({messages:[...history,{role:'user',content:text}],thinking:'off',state,...(Array.isArray(image)?{images:image}:{image})})});return (await r.text()).split('\n').filter(l=>l.startsWith('data:')).map(l=>JSON.parse(l.slice(5)));};
 const answer='[happy] Už mám výsledky, tady je ten seznam.\n'+Array.from({length:10},(_,i)=>(i+1)+'. Hra '+(i+1)).join('\n')+' [pamatuj: nepatří do paměti] [posun:14]';
 try{
  await until(()=>logs.includes('Verity probuzena'));
@@ -85,6 +85,20 @@ try{
  replies=[{text:'[hledat: výrobek na fotce]'}, {text:'[happy] Tady je nalezený výrobek. [posun:0]'}];n=await searchN();
  events=await chat('Najdi na internetu tento výrobek.',[],{},'data:image/png;base64,AA==');
  assert.equal(await searchN(),n+1);assert.ok(events.some(e=>e.search));assert.ok(events.some(e=>e.done));
+
+ // Všechny obrázky dorazí ke Gemmě v pořadí; neplatná sada se odmítne před LLM.
+ const images=Array.from({length:10},(_,i)=>'data:image/png;base64,'+Buffer.from('fixture-'+i).toString('base64'));
+ replies=[{text:'[happy] Vidím deset obrázků. [posun:0]'}];n=await searchN();
+ events=await chat('Porovnej přiložené obrázky.',[],{},images);
+ const vision=calls.at(-1).messages.at(-1).content;
+ assert.deepEqual(vision.filter(x=>x.type==='image_url').map(x=>x.image_url.url),images);
+ assert.equal(vision.at(-1).type,'text');assert.equal(await searchN(),n);assert.ok(events.some(e=>e.done));
+ for (const invalid of [Array(11).fill(images[0]),['https://fixture.invalid/private.png'],[null],'not-an-array']) {
+  replies=[];before=calls.length;
+  const rejected=await fetch('http://127.0.0.1:8796/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Forwarded-For':'192.0.2.10'},body:JSON.stringify({messages:[{role:'user',content:'Ahoj'}],images:invalid})});
+  assert.equal(rejected.status,400);assert.ok((await rejected.json()).error);assert.equal(calls.length,before);
+ }
+
  // Zrušení obyčejné odpovědi nesmí spustit opravnou generaci.
  const plainAbort=new AbortController();replies=[{slow:true}];before=calls.length;
  const plainRes=await fetch('http://127.0.0.1:8796/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:'Ahoj'}]}),signal:plainAbort.signal});

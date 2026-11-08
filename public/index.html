@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Verity</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23ffd21f'/%3E%3Cellipse cx='36' cy='40' rx='5' ry='9'/%3E%3Cellipse cx='64' cy='40' rx='5' ry='9'/%3E%3Cpath d='M30 62 Q50 80 70 62' stroke='%23000' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=20261108-2">
+<link rel="stylesheet" href="style.css?v=20261108-6">
 </head>
 <body class="voice-first">
   <div class="bg"></div><div class="scan"></div><div class="vignette"></div>
@@ -18,6 +18,26 @@
   </header>
     <aside class="menu" id="menu" aria-label="Nastavení" hidden>
 <div class="drawer-head"><h2>Nastavení</h2><button type="button" class="icon" id="menu-close" aria-label="Zavřít nastavení">×</button></div>
+  <section class="mic-test-panel" aria-label="Místní test mikrofonu">
+    <div class="mic-test-heading"><strong>Test mikrofonu</strong><span id="mic-test-state" data-signal="quiet">Vypnutý</span></div>
+    <p class="mic-test-note">Jen v prohlížeči · bez přepisu a odesílání</p>
+    <div class="mic-test-readings"><span>Vstup <output id="mic-test-level">— dBFS</output></span><span>Jistota řeči <output id="mic-test-prob">—</output></span></div>
+    <p id="mic-test-status" role="status">Mluv a nastav si práh na měřáku níže.</p>
+    <button type="button" id="mic-test-retry" class="plain">Spustit test znovu</button>
+  </section>
+  <div class="vad" id="vad">
+    <div class="vad-heading"><label for="mic-threshold">Citlivost mikrofonu</label><output id="vad-threshold-value" for="mic-threshold">−50 dB</output></div>
+    <div class="vad-row">
+      <span class="vad-mic" aria-hidden="true">🎙</span>
+      <div class="vad-control">
+        <div class="vad-bar" aria-hidden="true"><i id="vad-noise"></i><i id="vad-fill"></i><b id="vad-thr"></b></div>
+        <input id="mic-threshold" type="range" min="-70" max="-10" step="1" value="-50" aria-label="Práh mikrofonu" aria-describedby="vad-help">
+      </div>
+    </div>
+    <div class="vad-footer"><small id="vad-help">← citlivější · méně citlivý →</small><span class="vad-label" id="vad-label">ticho</span></div>
+  </div>
+
+
       <label class="think-row" title="Přemýšlení zlepší odpovědi, ale trvá déle (asi 20 s místo 2 s)">Přemýšlení
         <select id="opt-think">
           <option value="auto">automaticky (jen když chceš vysvětlit / pomoct)</option>
@@ -38,18 +58,6 @@
       </label>
       <small id="output-note" class="output-note"></small>
       <label title="Řeč pozná neuronová síť Silero VAD místo podle hlasitosti – lépe odlišuje hlas od okolních zvuků. Platí od dalšího zapnutí mikrofonu."><input type="checkbox" id="opt-silero"> Mikrofon: chytrá detekce řeči (Silero)</label>
-  <div class="vad" id="vad">
-    <div class="vad-heading"><label for="mic-threshold">Citlivost mikrofonu</label><output id="vad-threshold-value" for="mic-threshold">−50 dB</output></div>
-    <div class="vad-row">
-      <span class="vad-mic" aria-hidden="true">🎙</span>
-      <div class="vad-control">
-        <div class="vad-bar" aria-hidden="true"><i id="vad-noise"></i><i id="vad-fill"></i><b id="vad-thr"></b></div>
-        <input id="mic-threshold" type="range" min="-70" max="-10" step="1" value="-50" aria-label="Práh mikrofonu" aria-describedby="vad-help">
-      </div>
-    </div>
-    <div class="vad-footer"><small id="vad-help">← citlivější · méně citlivý →</small><span class="vad-label" id="vad-label">ticho</span></div>
-  </div>
-
   <div class="live-panel" id="live-panel" hidden>
     <div><b>ŽIVÝ ROZHOVOR</b><span id="live-status" aria-live="polite">Připojuji mikrofon…</span><small id="live-hint">Reproduktory: během odpovědi se vstup nepřepisuje.</small></div>
     <div class="live-actions"><button type="button" id="live-end">Ukončit</button></div>
@@ -91,8 +99,12 @@
 
   <main class="stage" id="stage">
     <div class="face-wrap" id="face"></div>
-    <div class="subtitle" id="subtitle" aria-live="polite"></div>
   </main>
+
+<section class="conversation-captions" id="conversation-captions" aria-label="Titulky a přepis mikrofonu" hidden>
+    <div class="caption-row"><span class="caption-speaker">Verity</span><div class="subtitle placeholder" id="subtitle" aria-live="polite">Tady uvidíš, co říkám.</div></div>
+    <div class="caption-row caption-user"><span class="caption-speaker" id="voice-draft-label">Ty</span><div class="voice-draft placeholder" id="voice-draft" aria-live="off">Tady uvidíš přepis svého mikrofonu.</div></div>
+  </section>
 
   <div class="activity" id="activity" data-state="ready" data-tone="idle" role="status" aria-live="polite" aria-atomic="true" hidden>
     <span class="activity-symbol" id="activity-symbol" aria-hidden="true">•</span>
@@ -101,7 +113,6 @@
   </div>
 
   <footer class="voice-controls" aria-label="Ovládání hovoru">
-    <div class="voice-draft" id="voice-draft" aria-live="off" hidden></div>
     <div class="call-actions">
       <button type="button" class="quiet-action" id="show-chat" aria-controls="chat-panel" aria-expanded="false">Přepis</button>
     <button type="button" id="mic" class="mic" aria-label="Začít mluvit" aria-pressed="false" title="Mluvit (zvuk se během nahrávání přepisuje na serveru)">
@@ -119,18 +130,17 @@
     <section class="log" id="log" aria-label="Přepis rozhovoru"></section>
     <div class="mic-state" id="mic-state" hidden aria-live="polite"></div>
   <div class="attach" id="attach" hidden>
-    <img id="attach-img" alt="Připravená fotka">
-    <span>fotka pro Verity</span>
-    <button type="button" class="icon" id="attach-x" aria-label="Zrušit fotku">×</button>
+    <div class="attach-head"><span id="attach-count">0 / 10 obrázků</span><button type="button" class="plain" id="attach-x">Odebrat všechny</button></div>
+    <div id="attach-list" class="attach-list" aria-label="Připravené obrázky"></div>
   </div>
   <form class="input" id="form" autocomplete="off">
     <button type="button" id="cam" class="tool" aria-label="Vyfotit" title="Vyfotit (telefon: foťák, počítač: webkamera)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke-width="2"/></svg>
     </button>
-    <button type="button" id="pic" class="tool" aria-label="Poslat obrázek" title="Poslat obrázek z galerie / ze souboru (na PC i Ctrl+V nebo přetažením)">
+    <button type="button" id="pic" class="tool" aria-label="Přidat obrázky" title="Poslat obrázek z galerie / ze souboru (na PC i Ctrl+V nebo přetažením)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke-width="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4" fill="none" stroke-width="2" stroke-linejoin="round"/></svg>
     </button>
-    <input type="file" id="pic-file" accept="image/*" hidden>
+    <input type="file" id="pic-file" accept="image/*" multiple hidden>
     <input type="file" id="cam-file" accept="image/*" capture="environment" hidden>
     <input id="msg" maxlength="1000" placeholder="Napiš mi něco…" aria-label="Zpráva pro Verity">
 
@@ -159,6 +169,6 @@
       <p class="wake-hint">Mikrofon zapnu až na tvé přání.</p>
     </div>
   </div>
-  <script type="module" src="app.js?v=20261108-4"></script>
+  <script type="module" src="app.js?v=20261108-6"></script>
 </body>
 </html>

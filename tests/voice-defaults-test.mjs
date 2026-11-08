@@ -40,7 +40,7 @@ const startCode=part('async function startLive()','async function stopLive(').re
 function startHarness(){
  let releaseAudio,releaseCapture;
  const dom=new Map(),el=id=>{if(!dom.has(id))dom.set(id,{value:'',hidden:false,disabled:false,textContent:''});return dom.get(id)};
- const h={liveSession:null,liveStarting:false,micFinishing:false,awake:true,micSupported:true,liveGeneration:0,liveBase:'',activity:{},busy:false,playing:false,current:null,music:{},face:{hear:0},outputMode:'aec',sileroVad:true,micThreshold:-50,actx:{},lastUserAt:0,
+ const h={micTestMode:false,photoPreparing:false,liveSession:null,liveStarting:false,micFinishing:false,awake:true,micSupported:true,liveGeneration:0,liveBase:'',activity:{},busy:false,playing:false,current:null,music:{},face:{hear:0},outputMode:'aec',sileroVad:true,micThreshold:-50,actx:{},lastUserAt:0,
   $:el,cancelMic:async()=>{},interrupt(){},liveUi(){},outputModeUi(){},micState(){},prepareCount:0,prepareEchoOutput:async()=>{h.prepareCount++},releaseEchoOutput(){},confirmEchoMode(){},inputSuppressed:()=>false,vadMeter(){},deliverLive(){},
   initAudio:()=>new Promise(r=>{releaseAudio=r}),
   mockImport:async()=>({startDialogue:()=>new Promise(r=>{releaseCapture=r})}),
@@ -59,10 +59,10 @@ assert.equal(roleplayPreference('Zapni znovu horor.',true),false);
 assert.equal(roleplayPreference('Řekl: „mluv normálně“.',false),false);
 assert.equal(roleplayPreference('[[UDÁLOST]] mluv normálně',false),false);
 
-const idleSource=app.slice(app.indexOf("setInterval(() => {\n  if (!awake || liveMode"),app.indexOf('let titleTimer = null;'));
+const idleSource=app.slice(app.indexOf("setInterval(() => {\n  if (!awake || micTestMode || liveMode"),app.indexOf('let titleTimer = null;'));
 assert.ok(idleSource.includes('converse('));
 function idleHarness(live){
- const h={awake:true,liveMode:live,busy:false,playing:false,mic:null,micFinishing:false,liveSession:null,liveStarting:false,document:{hidden:false},idleCount:0,lastUserAt:0,lastVerityAt:0,instability:90,requests:0,
+ const h={awake:true,micTestMode:false,photoPreparing:false,liveMode:live,busy:false,playing:false,mic:null,micFinishing:false,liveSession:null,liveStarting:false,document:{hidden:false},idleCount:0,lastUserAt:0,lastVerityAt:0,instability:90,requests:0,
  Date:{now:()=>120000},setInterval(fn){h.tick=fn},setInstability(v){h.instability=v},converse(){h.requests++}};
  vm.createContext(h);vm.runInContext(idleSource,h);h.tick();return h;
 }

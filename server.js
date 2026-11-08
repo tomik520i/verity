@@ -12,6 +12,7 @@ const { randomUUID } = require('crypto');
 const { MEMORY_PROMPT } = require('./memory-prompts');
 const memoryCore = import('./public/memory-core.mjs');
 const conversationMode = import('./public/conversation-mode.mjs');
+const imageLimits = import('./public/image-limits.mjs');
 
 const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 // Klíč k interní Whisper službě je v samostatném souboru (chmod 600), ne v config.json.
@@ -154,10 +155,10 @@ function formatResults(s) {
 }
 
 async function handleChat(req, res) {
-  const body = await readBody(req, 10 * 1024 * 1024);
-  // Fotka k poslední zprávě (vision): jen JPEG/PNG/WebP jako data URL, max ~6 MB.
-  const image = typeof body.image === 'string' && body.image.length < 8e6 &&
-    /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(body.image) ? body.image : null;
+  const body = await readBody(req, 20 * 1024 * 1024);
+  let images;
+  try { images = (await imageLimits).requestImages(body); }
+  catch (e) { return json(res, 400, {error:e.message}); }
   const history = (Array.isArray(body.messages) ? body.messages : [])
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-CFG.llm.history_limit)
@@ -260,7 +261,7 @@ async function handleChat(req, res) {
   }
   try {
     const contextual = history.slice(0, -1).some(m => m.role === 'user' && !m.content.startsWith('[[UDÁLOST]]')) && needsConversation(last.content);
-    const routed = !image ? detectSearch(last.content) : null;
+    const routed = !images.length ? detectSearch(last.content) : null;
     const mode = ['off', 'auto', 'on'].includes(body.thinking) ? body.thinking : (CFG.llm.thinking === true ? 'on' : CFG.llm.thinking || 'auto');
     const think = mode === 'on' || (mode === 'auto' && !ctx.liveVoice && !last.content.startsWith('[[') && !ctx.crisis &&
       (last.content.length > 160 || /(^|[^\p{L}])(vysvětli|vysvětlit|napiš|napsat|poraď|pomoz|pomoct|proč|jak (to|mám|se dá|funguje)|přelož|spočítej|porovnej|navrhni|shrň|oprav)(?!\p{L})/iu.test(last.content)));
@@ -284,9 +285,10 @@ async function handleChat(req, res) {
       }
       if (resolvedQuery) await research(resolvedQuery);
     } else {
-      if (image) {
+      if (images.length) {
         const m = messages[messages.length - 1];
-        m.content = [{ type: 'text', text: m.content }, { type: 'image_url', image_url: { url: image } }];
+        // Gemma doporučuje obrázky před textem; zachováme pořadí výběru.
+        m.content = [...images.map(url => ({type:'image_url',image_url:{url}})), {type:'text',text:m.content}];
       }
       const canSearch = searchAllowed && !ctx.crisis;
       // Bez svolení držíme text do kontroly značek: ani slib "hledám" se nesmí

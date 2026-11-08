@@ -1,6 +1,6 @@
 // Experimentální lokální živý rozhovor. Stejný mikrofon po celou dobu hovoru.
 // Nepořizuje archiv nahrávek. Režim výstupu volí reproduktory s blokováním vstupu / AEC / sluchátka.
-import { startMicrophone, joinTranscript } from './live-audio.js?v=20261107-6';
+import { startMicrophone, joinTranscript } from './live-audio.js?v=20261108-6';
 
 export function endPause(text) {
   const t = text.trim();

@@ -1,3 +1,4 @@
+import {MAX_IMAGES} from './image-limits.mjs';
 // Fotky pro Verity (vision): foťák / webkamera, galerie / soubor, vložení Ctrl+V, přetažení.
 // Každá fotka se před odesláním zmenší (max 1280 px, JPEG) a k ní se udělá miniatura do historie.
 //  - telefon: 📷 otevře přímo foťák (<input capture>), 🖼 galerii
@@ -20,8 +21,8 @@ async function decode(blob) {
   try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch { /* starší prohlížeč */ }
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Obrázek nejde načíst.'));
+    img.onload = () => { URL.revokeObjectURL(img.src); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('Obrázek nejde načíst.')); };
     img.src = URL.createObjectURL(blob);
   });
 }
@@ -31,7 +32,8 @@ export async function prepareBlob(blob) {
   if (blob.size > 30 * 1024 * 1024) throw new Error('Obrázek je moc velký (max 30 MB).');
   const bmp = await decode(blob);
   const w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight;
-  return { image: render(bmp, w, h, MAX_SIDE, 0.85), thumb: render(bmp, w, h, THUMB_SIDE, 0.7) };
+  try { return { image: render(bmp, w, h, MAX_SIDE, 0.85), thumb: render(bmp, w, h, THUMB_SIDE, 0.7) }; }
+  finally { bmp.close?.(); }
 }
 
 function prepareVideo(video) {
@@ -60,30 +62,40 @@ async function openWebcam(onPhoto, onError) {
     $('cam-file').click();
     return;
   }
-  $('webcam-shot').onclick = () => { const p = prepareVideo(video); close(); onPhoto(p); };
+  $('webcam-shot').onclick = () => { try { const p = prepareVideo(video); close(); onPhoto(p); } catch(e) { onError(e.message); } };
   $('webcam-flip').onclick = async () => { facing = facing === 'user' ? 'environment' : 'user'; try { await start(); } catch { /* jen jedna kamera */ } };
   $('webcam-cancel').onclick = close;
 }
 
-export function setupPhoto({ onPhoto, onError = () => {} }) {
-  const handleFiles = async files => {
-    const f = [...(files || [])].find(x => /^image\//.test(x.type));
-    if (!f) return;
-    try { onPhoto(await prepareBlob(f)); } catch (e) { onError(e.message); }
+export function setupPhoto({ onPhoto, onError = () => {}, onBusy = () => {}, getCount = () => 0, prepare = prepareBlob }) {
+  // Jedna fronta zachová pořadí i při rychlém opakovaném výběru/přetažení.
+  let queue = Promise.resolve(), batches = 0;
+  const handleFiles = files => {
+    const images = [...(files || [])].filter(x => x && /^image\//.test(x.type));
+    if (!images.length) return Promise.resolve();
+    batches++; onBusy(true);
+    queue = queue.then(async () => {
+      for (const file of images) {
+        if (getCount() >= MAX_IMAGES) { onError('Na jednu zprávu lze přidat nejvýše 10 obrázků.'); break; }
+        try { onPhoto(await prepare(file)); } catch (e) { onError(e.message); }
+      }
+    }).finally(() => { batches--; if (!batches) onBusy(false); });
+    return queue;
   };
   $('pic-file').onchange = e => { handleFiles(e.target.files); e.target.value = ''; };
   $('cam-file').onchange = e => { handleFiles(e.target.files); e.target.value = ''; };
   $('pic').onclick = () => $('pic-file').click();
   $('cam').onclick = () => {
-    if (touch || !navigator.mediaDevices?.getUserMedia) $('cam-file').click();   // telefon: nativní foťák
+    if (getCount() >= MAX_IMAGES) { onError('Nejdřív odeber některý z 10 obrázků.'); return; }
+    if (touch || !navigator.mediaDevices?.getUserMedia) $('cam-file').click();
     else openWebcam(onPhoto, onError);
   };
-  // Ctrl+V obrázku a přetažení souboru do okna
   document.addEventListener('paste', e => {
-    const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
-    if (item) { e.preventDefault(); handleFiles([item.getAsFile()]); }
+    const items = [...(e.clipboardData?.items || [])].filter(i => i.type.startsWith('image/'));
+    if (items.length) { e.preventDefault(); handleFiles(items.map(i => i.getAsFile())); }
   });
   document.addEventListener('dragover', e => { if ([...e.dataTransfer.items].some(i => i.type.startsWith('image/'))) { e.preventDefault(); document.body.classList.add('dropping'); } });
   document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
   document.addEventListener('drop', e => { document.body.classList.remove('dropping'); if (e.dataTransfer.files?.length) { e.preventDefault(); handleFiles(e.dataTransfer.files); } });
+  return {handleFiles};
 }
