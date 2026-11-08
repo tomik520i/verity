@@ -73,3 +73,7 @@ Ověření 8. 11. 2026 na místním LLM: sady 5 a 10 očíslovaných karet vrát
 - [Technická dokumentace Verity](../DOKUMENTACE.md) — lifecycle hlasu, titulky, API, soukromí a obnova.
 
 Repozitář obsahuje web, Node proxy, Python vyhledávání, testy a přibalený Silero/ONNX browser runtime. Instalace a váhy LLM/STT/TTS, hlasová reference, konfigurace služeb, klíče a osobní záznamy jsou mimo repozitář. Samotný clone GitHubu proto nenainstaluje celý GPU stack; soukromé adresy se doplňují podle config.example.json.
+
+## Anime animace
+
+29 výrazů, sedm nálad a sedm idle režimů používá vlastní SVG a requestAnimationFrame. Gemma emituje validované značky, lokální JavaScript řídí pohyb a plynulé přechody. Nepřibyl další model, CDN ani nová hlasová váha. Katalog a popis: [EMOCE.md](EMOCE.md); testy skutečné Gemmy: [EMOCE-A-SIMULACE.md](EMOCE-A-SIMULACE.md).

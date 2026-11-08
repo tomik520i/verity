@@ -18,7 +18,8 @@ LLM, přepis i hlas běží na vlastním hardwaru. Hledání na internetu použ�
 - **Místní test citlivosti** – otevření nastavení zapne mikrofon jen pro měřák dBFS, pravděpodobnosti řeči a živý práh. Žádný zvuk z testu nejde do Whisperu či Verity; zavřením se mikrofon uvolní.
 - **Stav práce** – poslouchání, přepis, přemýšlení, hledání, mluvení, dokončení a chyba.
 
-- **Emoce v reálném čase** – model každou větu označí emocí (`[happy]`, `[jealous]`, `[unhinged]`…, 13 druhů) a obličej se plynule přetváří, i uprostřed odpovědi.
+- **Anime výrazy a gesta** – 29 emocí včetně komického uražení, sedm pomalejších nálad, hvězdičkové/srdíčkové oči, kapičky, ruměnec, úleky a pružné pohyby. Gesta začínají s přehrávanou větou. [Úplný seznam emocí](docs/EMOCE.md).
+- **Sedm klidových animací** – rozhlížení, naklánění, protažení, podřimování, zhoupnutí, pokukování a klidné čekání. Bez automatických zpráv; při aktivitě ustoupí. Živost i idle lze upravit v nastavení.
 - **Nestabilita 0–100** – čtyři roleplay fáze: zářící → přilnavá → majetnická → rozpadající se. Mění výraz, oči, úsměv a atmosféru. „Mluv normálně“ hororový tón vypne i pro další zprávy; lze jej vrátit v nastavení. V živém režimu Verity po ukončení sama nepromlouvá a neblokuje odchod ze stránky.
 - **Hlas a lip sync** – každá věta se syntetizuje zvlášť (další se generuje, zatímco předchozí hraje); pusa se hýbe podle skutečného audia (hlasitost + spektrum → otevření a zakulacení).
 - **Mluvení jako hlavní způsob ovládání** – průběžný hovor s Whisperem, odesíláním po pauze a hlasovou odpovědí. Starší režimy a ruční odesílání zůstávají dostupné.
@@ -98,13 +99,13 @@ Přepis mikrofonu se průběžně opravuje. Gemma dostane hotový tah až při o
 ## Jak je aplikace poskládaná
 
 1. **Prompt a cache:** statická osobnost → ověřená paměť → historie → proměnlivý kontext posledního tahu. Čas, fáze a stav mikrofonu se nepřidávají před celý stabilní prefix.
-2. **Řídicí značky:** `[emoce]` mění obličej, `[posun:N]` upravuje nestabilitu. `[hledat: dotaz]` podléhá serverovému oprávnění. Staré `[pamatuj: ...]` a `[zapomeň: ...]` už nemění paměť.
+2. **Řídicí značky:** [emoce:intenzita][mood:nálada] řídí výraz a rozpoložení. Zpětně kompatibilní `[emoce]` mění obličej, `[posun:N]` upravuje nestabilitu. `[hledat: dotaz]` podléhá serverovému oprávnění. Staré `[pamatuj: ...]` a `[zapomeň: ...]` už nemění paměť.
 3. **Hlas:** stream se dělí na segmenty, další se syntetizuje během přehrávání předchozího. Přerušení ruší LLM, TTS a zvukovou frontu; stará odpověď se po dokončení požadavku nevrátí do přehrávání.
 4. **Mikrofon:** nativní PCM → převzorkování → Silero a práh → samostatné WAV snímky → průběžný a finální Whisper přepis. Hovor může zůstat otevřený přes více tahů.
 5. **Paměť:** aktuální fakta mají klíče, důkaz a expiraci. Pracovní okno se při překročení 60 zpráv posune o 30; archiv tvoří ověřené lidské citace. Původní plná historie zůstává lokálně.
 6. **Ochrana:** limity na klientskou IP, omezená souběžnost, blokace cross-site POSTů a interní klíč k Whisperu pouze na serveru. Hledání je kontrolované serverem, ne samotným příslibem modelu.
 
-Podrobnosti prahů, časování, protokolů, emocí, lip syncu, výměny animace, API, provozu a obnovy najdeš v **[DOKUMENTACE.md](DOKUMENTACE.md)**. Podklady k osobnosti a testům Gemmy jsou v **[docs/ROLEPLAY.md](docs/ROLEPLAY.md)**.
+Podrobnosti prahů, časování, protokolů, emocí, lip syncu, výměny animace, API, provozu a obnovy najdeš v **[DOKUMENTACE.md](DOKUMENTACE.md)**. Podklady k osobnosti jsou v **[docs/ROLEPLAY.md](docs/ROLEPLAY.md)**. Nové [emoce a idle animace](docs/EMOCE.md) doplňuje [vyhodnocení skutečných simulací Gemmy](docs/EMOCE-A-SIMULACE.md), včetně zjištěných chyb.
 
 ## Struktura
 
@@ -118,7 +119,11 @@ config.example.json  vzor konfigurace (zkopíruj na config.json)
 public/
   index.html, style.css
   app.js             stream, parser značek, fronta TTS, lip sync, mikrofon, paměť, vnímání
-  face.js            animovaný obličej (třída Face) – vyměnitelná část
+  face.js            anime obličej (třída Face), gesta a lip sync
+  emotions.json      společný katalog 29 výrazů a 7 nálad
+  expression-state.mjs plynulé rozpoložení a intenzita
+  animation-director.mjs sedm místních idle režimů
+  performance-parser.mjs streamované herecké značky
   live-audio.js      živý přepis: detekce řeči, pauzy, ruchu; WAV snímky
   pcm-worklet.js     AudioWorklet a FIR převzorkování
   dialogue.js        navazující tahy hovoru a přerušení

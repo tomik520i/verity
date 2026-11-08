@@ -1,3 +1,4 @@
+import {createPerformanceParser} from '../public/performance-parser.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
@@ -58,7 +59,7 @@ for(const u of original.history.slice(-12).filter(m=>m.role==='user'&&!m.content
 assert.equal(research.needsConversation('Jo, tak zkus hledat v angličtině, teď je to úplně jedno.'),true);
 const app=await fs.readFile(new URL('../public/app.js',import.meta.url),'utf8');
 const start=app.indexOf('function makeParser('),end=app.indexOf('// ── log',start);
-const sandbox={EMOTIONS:['happy'],queue:[],playing:false,face:{setEmotion(){}},clamp:(v,lo,hi)=>Math.min(hi,Math.max(lo,v)),changed:0};
+const sandbox={createPerformanceParser,expressionCatalog:JSON.parse(await fs.readFile(new URL('../public/emotions.json',import.meta.url),'utf8')),EMOTIONS:['happy'],queue:[],playing:false,face:{setEmotion(){}},clamp:(v,lo,hi)=>Math.min(hi,Math.max(lo,v)),changed:0};
 vm.createContext(sandbox);vm.runInContext(app.slice(start,end)+'\nmakeParser(()=>{},()=>{},()=>changed++).feed("[pamatuj: žije na Marsu] [zapomeň: jméno] [happy] Ahoj.");',sandbox);
 assert.equal(sandbox.changed,0,'assistant tags must not mutate memory');
 for(const [message,evidence] of [['Představ si, že jsem král a bydlím na Marsu.','bydlím na Marsu'],['Verity řekla: „Jmenuji se Karel“.','Jmenuji se Karel']]) assert.equal(validateOperations([{op:'upsert',key:'identity.name',text:evidence,kind:'identity',evidence}],message,m,now,now).length,0);

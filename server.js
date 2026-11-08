@@ -5,11 +5,12 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
-const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT, detectCrisis, detectCalc } = require('./prompt');
+const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT, detectCrisis, detectCalc, detectFeedback } = require('./prompt');
 
 const { searchRequest, detectSearch, needsConversation, QUERY_PROMPT, requestedCount, outputBudget, RESEARCH_PROMPT, cleanResearch, researchProblem } = require('./research');
 const { randomUUID } = require('crypto');
 const { MEMORY_PROMPT } = require('./memory-prompts');
+const EXPRESSION_CATALOG=require('./public/emotions.json');
 const memoryCore = import('./public/memory-core.mjs');
 const conversationMode = import('./public/conversation-mode.mjs');
 const imageLimits = import('./public/image-limits.mjs');
@@ -175,6 +176,8 @@ async function handleChat(req, res) {
     : history.filter(m=>m.role==='user').reduce((v,m)=>roleplayPreference(m.content,v),false);
   const ctx = {
     searchAllowed, normalConversation:roleplayPaused,
+    feedback:detectFeedback(history[history.length-1].content),
+    mood:!roleplayPaused && Object.hasOwn(EXPRESSION_CATALOG.moods,st.mood) ? st.mood : 'warm',
     instability: num(st.instability, 0, 100) || 0,
     localTime: typeof st.localTime === 'string' ? st.localTime.slice(0, 40) : null,
     weekday: typeof st.weekday === 'string' ? st.weekday.slice(0, 20) : null,
@@ -443,7 +446,8 @@ async function handleTts(req, res) {
   if (!/[\p{L}\p{N}]/u.test(text)) return json(res, 400, { error: 'prázdný text' });
   const t = CFG.tts;
   const emo = EMOTIONS.includes(body.emotion) ? body.emotion : 'neutral';
-  const over = t.emotions[emo] || {};
+  const over = {...EXPRESSION_CATALOG.emotions[emo],...(t.emotions?.[emo] || {})};
+  const intensity=Number.isFinite(body.intensity)?Math.max(0,Math.min(1,body.intensity)):.65;
   // Emoce může mít vlastní referenci (např. šepot klonovaný ze šepotané nahrávky – design režim
   // OmniVoice je trénovaný jen na čínštině a angličtině, česky šepot nespolehlivě šumí).
   const refWav = over.speaker_wav && fs.existsSync(over.speaker_wav) ? over.speaker_wav : t.speaker_wav;
@@ -452,7 +456,7 @@ async function handleTts(req, res) {
   const settings = {
     voice_mode: cloning ? 'clone' : 'design',
     language: t.language, num_step: t.num_step, seed: t.seed, normalize_text: true,
-    speed: Math.max(0.5, Math.min(2, (over.speed || 1) * (t.speed || 1))),
+    speed: Math.max(0.5, Math.min(2, (1+((over.speed||1)-1)*(.5+.5*intensity)) * (t.speed || 1))),
   };
   if (cloning) settings.reference_text = refText;
   else settings.instruct = [t.instruct, over.instruct_extra].filter(Boolean).join(', ');

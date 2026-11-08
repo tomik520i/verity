@@ -1,0 +1,570 @@
+{
+  "version": 2,
+  "moods": {
+    "warm": {
+      "label": "V pohodě",
+      "color": "#ffd15b",
+      "face": {
+        "curve": 5,
+        "glow": 1.08
+      }
+    },
+    "playful": {
+      "label": "Hravá",
+      "color": "#ffd777",
+      "face": {
+        "curve": 7,
+        "tilt": -2,
+        "bob": 1.1
+      }
+    },
+    "focused": {
+      "label": "Soustředěná",
+      "color": "#dfcd81",
+      "face": {
+        "browOp": 0.45,
+        "lookY": -2,
+        "w": 39,
+        "glow": 0.85
+      }
+    },
+    "tender": {
+      "label": "Laskavá",
+      "color": "#ffc9ae",
+      "face": {
+        "curve": 7,
+        "blush": 0.18,
+        "ery": 23,
+        "tilt": -2
+      }
+    },
+    "uneasy": {
+      "label": "Nesvá",
+      "color": "#edb986",
+      "face": {
+        "brow": -9,
+        "browOp": 0.5,
+        "w": 37,
+        "curve": 5
+      }
+    },
+    "gloomy": {
+      "label": "Zamyšlená",
+      "color": "#bdb6ba",
+      "face": {
+        "lookY": 3,
+        "curve": -4,
+        "dim": 0.12,
+        "bob": 0.65
+      }
+    },
+    "eerie": {
+      "label": "Znepokojivě klidná",
+      "color": "#f2a354",
+      "face": {
+        "curve": 23,
+        "red": 0.13,
+        "ery": 24,
+        "bob": 0.6
+      }
+    }
+  },
+  "emotions": {
+    "neutral": {
+      "label": "Klidná",
+      "mood": "warm",
+      "gesture": "settle",
+      "speed": 1,
+      "face": {}
+    },
+    "happy": {
+      "label": "Veselá",
+      "mood": "warm",
+      "gesture": "nod",
+      "speed": 1.05,
+      "face": {
+        "ery": 22,
+        "w": 58,
+        "curve": 34,
+        "open": 13,
+        "glow": 1.2,
+        "bob": 1.1,
+        "smileEye": 1
+      }
+    },
+    "excited": {
+      "label": "Nadšená",
+      "mood": "playful",
+      "gesture": "perk",
+      "speed": 1.12,
+      "face": {
+        "erx": 18,
+        "ery": 30,
+        "w": 66,
+        "curve": 34,
+        "open": 28,
+        "glow": 1.4,
+        "bob": 1.5,
+        "scale": 1.04,
+        "sparkle": 1,
+        "starEye": 1
+      }
+    },
+    "curious": {
+      "label": "Zvědavá",
+      "mood": "focused",
+      "gesture": "tilt",
+      "speed": 1,
+      "face": {
+        "ery": 28,
+        "eryL": -8,
+        "brow": -6,
+        "browOp": 0.7,
+        "w": 26,
+        "curve": 6,
+        "open": 4,
+        "tilt": 9
+      }
+    },
+    "love": {
+      "label": "Okouzlená",
+      "mood": "tender",
+      "gesture": "soften",
+      "speed": 0.97,
+      "face": {
+        "ery": 19,
+        "w": 50,
+        "curve": 26,
+        "open": 4,
+        "blush": 1,
+        "glow": 1.3,
+        "tilt": -5,
+        "smileEye": 0.4,
+        "heartEye": 1
+      }
+    },
+    "shy": {
+      "label": "Nesmělá",
+      "mood": "tender",
+      "gesture": "avert",
+      "speed": 0.95,
+      "face": {
+        "ery": 20,
+        "lookX": -7,
+        "lookY": 5,
+        "w": 24,
+        "curve": 10,
+        "blush": 1,
+        "tilt": -8,
+        "scale": 0.97,
+        "sweat": 0.3
+      }
+    },
+    "sad": {
+      "label": "Smutná",
+      "mood": "gloomy",
+      "gesture": "bow",
+      "speed": 0.92,
+      "face": {
+        "ery": 22,
+        "lookY": 6,
+        "brow": -22,
+        "browOp": 1,
+        "w": 34,
+        "curve": -16,
+        "glow": 0.7,
+        "dim": 0.25,
+        "bob": 0.5,
+        "tear": 0.8,
+        "watery": 1
+      }
+    },
+    "lonely": {
+      "label": "Osamělá",
+      "mood": "gloomy",
+      "gesture": "bow",
+      "speed": 0.88,
+      "face": {
+        "ery": 21,
+        "lookY": 9,
+        "lookX": 4,
+        "brow": -16,
+        "browOp": 0.8,
+        "w": 26,
+        "curve": -8,
+        "glow": 0.5,
+        "dim": 0.4,
+        "bob": 0.4,
+        "scale": 0.95
+      }
+    },
+    "scared": {
+      "label": "Vylekaná",
+      "mood": "uneasy",
+      "gesture": "recoil",
+      "speed": 1.08,
+      "face": {
+        "erx": 22,
+        "ery": 38,
+        "brow": -18,
+        "browOp": 0.9,
+        "w": 22,
+        "curve": -6,
+        "open": 32,
+        "shake": 0.5,
+        "glow": 0.8,
+        "sweat": 1,
+        "shock": 1
+      }
+    },
+    "jealous": {
+      "label": "Žárlivá",
+      "mood": "eerie",
+      "gesture": "sideeye",
+      "speed": 0.98,
+      "face": {
+        "ery": 12,
+        "lookX": 8,
+        "brow": 14,
+        "browOp": 0.8,
+        "w": 40,
+        "curve": 6,
+        "red": 0.2,
+        "tilt": 4,
+        "mouthBias": 5
+      }
+    },
+    "angry": {
+      "label": "Rozčilená",
+      "mood": "uneasy",
+      "gesture": "shake",
+      "speed": 1.08,
+      "face": {
+        "ery": 14,
+        "brow": 36,
+        "browOp": 1,
+        "w": 44,
+        "curve": -12,
+        "open": 7,
+        "red": 0.45,
+        "shake": 0.6,
+        "glow": 1.1,
+        "anger": 1,
+        "puff": 0.55
+      }
+    },
+    "unhinged": {
+      "label": "Rozrušená",
+      "mood": "eerie",
+      "gesture": "still",
+      "speed": 0.85,
+      "face": {
+        "erx": 10,
+        "ery": 31,
+        "w": 100,
+        "curve": 44,
+        "open": 24,
+        "teeth": 1,
+        "red": 1,
+        "shake": 0.7,
+        "glow": 1.4,
+        "scale": 1.04,
+        "browAsym": 5
+      }
+    },
+    "whisper": {
+      "label": "Šeptající",
+      "mood": "eerie",
+      "gesture": "lean",
+      "speed": 0.95,
+      "face": {
+        "ery": 15,
+        "lookY": 3,
+        "w": 22,
+        "curve": 8,
+        "open": 6,
+        "glow": 0.6,
+        "dim": 0.35,
+        "scale": 1.08,
+        "bob": 0.3
+      }
+    },
+    "calm": {
+      "label": "Vyrovnaná",
+      "mood": "warm",
+      "gesture": "settle",
+      "speed": 0.97,
+      "face": {
+        "ery": 22,
+        "w": 43,
+        "curve": 15,
+        "glow": 1.05,
+        "bob": 0.6,
+        "smileEye": 0.15
+      }
+    },
+    "amused": {
+      "label": "Pobavená",
+      "mood": "playful",
+      "gesture": "chuckle",
+      "speed": 1.05,
+      "face": {
+        "ery": 17,
+        "w": 63,
+        "curve": 31,
+        "open": 25,
+        "smileEye": 1.2,
+        "browOp": 0.3,
+        "blush": 0.15,
+        "tilt": -4
+      }
+    },
+    "proud": {
+      "label": "Hrdá",
+      "mood": "warm",
+      "gesture": "perk",
+      "speed": 1.03,
+      "face": {
+        "ery": 20,
+        "w": 58,
+        "curve": 25,
+        "browOp": 0.5,
+        "brow": 3,
+        "lookY": -3,
+        "scale": 1.025,
+        "sparkle": 0.7,
+        "mouthBias": 8
+      }
+    },
+    "relieved": {
+      "label": "Ulevená",
+      "mood": "warm",
+      "gesture": "exhale",
+      "speed": 0.94,
+      "face": {
+        "ery": 19,
+        "w": 47,
+        "curve": 21,
+        "brow": -7,
+        "browOp": 0.55,
+        "smileEye": 0.7,
+        "bob": 0.7
+      }
+    },
+    "grateful": {
+      "label": "Vděčná",
+      "mood": "tender",
+      "gesture": "nod",
+      "speed": 0.97,
+      "face": {
+        "ery": 21,
+        "w": 45,
+        "curve": 23,
+        "blush": 0.6,
+        "tilt": -3,
+        "glow": 1.15,
+        "smileEye": 0.3,
+        "watery": 0.4
+      }
+    },
+    "empathetic": {
+      "label": "Chápavá",
+      "mood": "tender",
+      "gesture": "soften",
+      "speed": 0.94,
+      "face": {
+        "ery": 24,
+        "brow": -15,
+        "browOp": 0.8,
+        "w": 35,
+        "curve": 7,
+        "tilt": -5,
+        "glow": 0.9,
+        "bob": 0.5,
+        "watery": 0.45
+      }
+    },
+    "worried": {
+      "label": "Ustaraná",
+      "mood": "uneasy",
+      "gesture": "tilt",
+      "speed": 0.96,
+      "face": {
+        "ery": 28,
+        "brow": -23,
+        "browOp": 1,
+        "w": 30,
+        "curve": -5,
+        "lookY": 1,
+        "tilt": 4,
+        "dim": 0.08,
+        "sweat": 0.55
+      }
+    },
+    "confused": {
+      "label": "Zmatená",
+      "mood": "focused",
+      "gesture": "tilt",
+      "speed": 0.98,
+      "face": {
+        "ery": 24,
+        "eryL": -8,
+        "brow": -4,
+        "browAsym": 20,
+        "browOp": 1,
+        "w": 30,
+        "curve": 1,
+        "mouthBias": 7,
+        "tilt": 10,
+        "question": 1
+      }
+    },
+    "skeptical": {
+      "label": "Pochybující",
+      "mood": "focused",
+      "gesture": "sideeye",
+      "speed": 0.98,
+      "face": {
+        "ery": 15,
+        "eryL": 5,
+        "brow": 3,
+        "browAsym": 23,
+        "browOp": 1,
+        "w": 35,
+        "curve": 3,
+        "mouthBias": 9,
+        "lookX": 5,
+        "tilt": -5,
+        "flatEye": 0.8
+      }
+    },
+    "surprised": {
+      "label": "Překvapená",
+      "mood": "playful",
+      "gesture": "recoil",
+      "speed": 1.06,
+      "face": {
+        "erx": 25,
+        "ery": 39,
+        "brow": -16,
+        "browOp": 0.9,
+        "w": 24,
+        "curve": 0,
+        "open": 37,
+        "scale": 1.02,
+        "shock": 1
+      }
+    },
+    "embarrassed": {
+      "label": "Rozpačitá",
+      "mood": "uneasy",
+      "gesture": "avert",
+      "speed": 0.96,
+      "face": {
+        "ery": 20,
+        "eryL": 3,
+        "brow": -7,
+        "browAsym": 9,
+        "browOp": 0.75,
+        "w": 35,
+        "curve": 9,
+        "mouthBias": 8,
+        "blush": 1,
+        "lookY": 6,
+        "tilt": -7,
+        "sweat": 1,
+        "flatEye": 0
+      }
+    },
+    "determined": {
+      "label": "Odhodlaná",
+      "mood": "focused",
+      "gesture": "nod",
+      "speed": 1.03,
+      "face": {
+        "ery": 21,
+        "brow": 13,
+        "browOp": 0.85,
+        "w": 44,
+        "curve": 10,
+        "lookY": -1,
+        "scale": 1.02,
+        "glow": 1.1,
+        "sparkle": 0.4
+      }
+    },
+    "disappointed": {
+      "label": "Zklamaná",
+      "mood": "gloomy",
+      "gesture": "exhale",
+      "speed": 0.93,
+      "face": {
+        "ery": 15,
+        "brow": -12,
+        "browOp": 0.8,
+        "w": 38,
+        "curve": -8,
+        "lookY": 5,
+        "dim": 0.16,
+        "bob": 0.5,
+        "flatEye": 1
+      }
+    },
+    "playful": {
+      "label": "Šibalská",
+      "mood": "playful",
+      "gesture": "wink",
+      "speed": 1.05,
+      "face": {
+        "ery": 22,
+        "eryL": -6,
+        "brow": 4,
+        "browAsym": 8,
+        "browOp": 0.65,
+        "w": 54,
+        "curve": 23,
+        "mouthBias": 12,
+        "tilt": 7,
+        "blush": 0.15,
+        "smileEye": 0
+      }
+    },
+    "tired": {
+      "label": "Unavená",
+      "mood": "gloomy",
+      "gesture": "exhale",
+      "speed": 0.91,
+      "face": {
+        "ery": 12,
+        "brow": -6,
+        "browOp": 0.4,
+        "w": 32,
+        "curve": 4,
+        "lookY": 5,
+        "dim": 0.18,
+        "bob": 0.4,
+        "tilt": -3,
+        "flatEye": 1
+      }
+    },
+    "offended": {
+      "label": "Uražená",
+      "mood": "uneasy",
+      "gesture": "huff",
+      "speed": 0.96,
+      "face": {
+        "ery": 12,
+        "lookX": 17,
+        "brow": 14,
+        "browOp": 1,
+        "w": 22,
+        "curve": -10,
+        "open": 1,
+        "mouthBias": 4,
+        "blush": 0.4,
+        "tilt": -12,
+        "puff": 1
+      }
+    }
+  }
+}

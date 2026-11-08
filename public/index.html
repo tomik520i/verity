@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Verity</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23ffd21f'/%3E%3Cellipse cx='36' cy='40' rx='5' ry='9'/%3E%3Cellipse cx='64' cy='40' rx='5' ry='9'/%3E%3Cpath d='M30 62 Q50 80 70 62' stroke='%23000' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=20261108-6">
+<link rel="stylesheet" href="style.css?v=20261108-9">
 </head>
 <body class="voice-first">
   <div class="bg"></div><div class="scan"></div><div class="vignette"></div>
@@ -68,6 +68,8 @@
       <label title="Po 2,2 s ticha se mluvená zpráva odešle sama"><input type="checkbox" id="opt-auto"> Mluvení: odeslat samo po pauze</label>
       <label title="Po dohrání odpovědi se mikrofon zapne sám, odesílá se po pauze. Když 15 s nemluvíš, zavře se."><input type="checkbox" id="opt-conv"> Konverzace: po odpovědi hned poslouchat</label>
       <label><input type="checkbox" id="opt-meter"> Ukázat pouto</label>
+      <div class="expressiveness-setting"><label for="opt-expressiveness">Živost postavy</label><output id="expressiveness-value" for="opt-expressiveness">85 %</output><input id="opt-expressiveness" type="range" min="0" max="100" step="5" value="85"><small>Jemnější ← anime mimika a gesta → výraznější</small></div>
+      <label><input type="checkbox" id="opt-idle-animations" checked> Klidové animace postavy</label>
 </details>
 <details class="settings-group"><summary>Hudba a stav služeb</summary>      <div class="music-box">
         <span class="music-title">Podkres</span>
@@ -99,6 +101,7 @@
 
   <main class="stage" id="stage">
     <div class="face-wrap" id="face"></div>
+    <div class="emotion-status" id="emotion-status" aria-label="Rozpoložení Verity" hidden><i class="mood-dot" aria-hidden="true"></i><span id="emotion-mood">V pohodě</span><span class="mood-separator" aria-hidden="true">·</span><strong id="emotion-name">Klidná</strong><span class="emotion-meter" aria-hidden="true"><i id="emotion-strength"></i></span></div>
   </main>
 
 <section class="conversation-captions" id="conversation-captions" aria-label="Titulky a přepis mikrofonu" hidden>
@@ -169,6 +172,6 @@
       <p class="wake-hint">Mikrofon zapnu až na tvé přání.</p>
     </div>
   </div>
-  <script type="module" src="app.js?v=20261108-6"></script>
+  <script type="module" src="app.js?v=20261108-9"></script>
 </body>
 </html>

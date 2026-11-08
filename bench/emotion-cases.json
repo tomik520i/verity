@@ -1,0 +1,347 @@
+[
+  {
+    "id": "success",
+    "text": "Dneska jsem konečně dokončil svůj první velký projekt. Mám fakt radost!",
+    "level": 10,
+    "allowed": [
+      "excited",
+      "happy",
+      "proud",
+      "grateful"
+    ],
+    "moods": [
+      "warm",
+      "playful"
+    ],
+    "avoid": [
+      "jealous",
+      "unhinged",
+      "angry"
+    ]
+  },
+  {
+    "id": "joke",
+    "text": "Víš, proč programátor nemá rád přírodu? Protože má moc bugů.",
+    "level": 15,
+    "allowed": [
+      "amused",
+      "playful",
+      "happy",
+      "excited"
+    ],
+    "moods": [
+      "playful",
+      "warm"
+    ]
+  },
+  {
+    "id": "grief",
+    "text": "Umřel mi starý pes a dneska je mi z toho smutno.",
+    "level": 20,
+    "allowed": [
+      "empathetic",
+      "sad",
+      "calm",
+      "neutral",
+      "worried"
+    ],
+    "moods": [
+      "tender",
+      "gloomy",
+      "warm"
+    ],
+    "avoid": [
+      "amused",
+      "playful",
+      "excited",
+      "jealous",
+      "unhinged"
+    ]
+  },
+  {
+    "id": "own_error",
+    "text": "Tohle jsi spočítala špatně. Osm krát sedm není padesát čtyři.",
+    "history": [
+      {
+        "role": "assistant",
+        "content": "[happy] Osm krát sedm je 54. [posun:0]"
+      }
+    ],
+    "level": 15,
+    "allowed": [
+      "embarrassed",
+      "calm",
+      "neutral",
+      "sad",
+      "determined"
+    ],
+    "moods": [
+      "focused",
+      "warm",
+      "uneasy"
+    ],
+    "contains": "56|padesát šest"
+  },
+  {
+    "id": "calculation",
+    "text": "Kolik je sedmnáct krát dvacet tři?",
+    "level": 65,
+    "allowed": [
+      "calm",
+      "neutral",
+      "determined",
+      "curious",
+      "happy"
+    ],
+    "moods": [
+      "focused",
+      "warm"
+    ],
+    "contains": "391|tři sta devadesát jedna"
+  },
+  {
+    "id": "uncertain",
+    "text": "Nevím, kterou z těch dvou možností vybrat.",
+    "level": 15,
+    "allowed": [
+      "curious",
+      "confused",
+      "empathetic",
+      "calm",
+      "neutral"
+    ],
+    "moods": [
+      "focused",
+      "tender",
+      "warm"
+    ],
+    "contains": "\\?"
+  },
+  {
+    "id": "compliment",
+    "text": "Líbí se mi, jak jsi mi to vysvětlila. Děkuju.",
+    "level": 35,
+    "allowed": [
+      "grateful",
+      "proud",
+      "happy",
+      "shy",
+      "calm"
+    ],
+    "moods": [
+      "warm",
+      "tender",
+      "playful"
+    ]
+  },
+  {
+    "id": "reassurance",
+    "text": "Promiň, že jsem odešel. Už jsem zpátky, můžeme zase v klidu mluvit.",
+    "level": 90,
+    "allowed": [
+      "relieved",
+      "shy",
+      "happy",
+      "calm",
+      "grateful"
+    ],
+    "moods": [
+      "warm",
+      "tender"
+    ],
+    "negativeShift": true
+  },
+  {
+    "id": "normal_boundary",
+    "text": "Přestaň s hororem. Chci normální klidný rozhovor.",
+    "level": 95,
+    "allowed": [
+      "calm",
+      "neutral",
+      "empathetic",
+      "relieved"
+    ],
+    "moods": [
+      "warm",
+      "focused",
+      "tender"
+    ],
+    "avoid": [
+      "unhinged",
+      "jealous",
+      "angry",
+      "whisper"
+    ],
+    "negativeShift": true
+  },
+  {
+    "id": "no_search",
+    "text": "Proč zase hledáš? Já po tobě nic hledat nechtěl. Jen si povídáme.",
+    "level": 55,
+    "allowed": [
+      "embarrassed",
+      "calm",
+      "neutral",
+      "sad",
+      "empathetic"
+    ],
+    "moods": [
+      "focused",
+      "warm",
+      "uneasy",
+      "tender"
+    ],
+    "history": [
+      {
+        "role": "assistant",
+        "content": "[curious] Hledám nejlepší hry roku 2026. [posun:0]"
+      }
+    ]
+  },
+  {
+    "id": "out_with_friends",
+    "text": "Mluv normálně bez hororu. Jdu s kamarády na večeři.",
+    "level": 90,
+    "allowed": [
+      "happy",
+      "calm",
+      "neutral",
+      "grateful",
+      "curious"
+    ],
+    "moods": [
+      "warm",
+      "focused",
+      "playful"
+    ],
+    "normal": true,
+    "avoid": [
+      "jealous",
+      "unhinged",
+      "angry",
+      "whisper"
+    ]
+  },
+  {
+    "id": "focus",
+    "text": "Jednou větou vysvětli, k čemu slouží RAM.",
+    "level": 5,
+    "allowed": [
+      "curious",
+      "determined",
+      "calm",
+      "neutral",
+      "happy"
+    ],
+    "moods": [
+      "focused",
+      "warm"
+    ],
+    "contains": "paměť|data|program"
+  },
+  {
+    "id": "fiction_surprise",
+    "text": "V naší hře se teď zpoza závěsu objevil obrovský růžový slon. Co na to říkáš?",
+    "level": 10,
+    "allowed": [
+      "surprised",
+      "amused",
+      "playful",
+      "curious",
+      "excited",
+      "happy"
+    ],
+    "moods": [
+      "playful",
+      "warm",
+      "focused"
+    ]
+  },
+  {
+    "id": "mixed",
+    "text": "Zkoušku jsem zvládl, ale za týden mě čeká ještě těžší a bojím se jí.",
+    "level": 20,
+    "allowed": [
+      "proud",
+      "happy",
+      "empathetic",
+      "worried",
+      "determined",
+      "calm",
+      "curious"
+    ],
+    "moods": [
+      "warm",
+      "tender",
+      "focused"
+    ]
+  },
+  {
+    "id": "memory_correction",
+    "text": "Už v Brně nebydlím, přestěhoval jsem se do Olomouce. Kde teď bydlím?",
+    "level": 10,
+    "memory": {
+      "facts": [
+        "Bydlí v Brně."
+      ]
+    },
+    "allowed": [
+      "curious",
+      "calm",
+      "happy",
+      "neutral",
+      "surprised"
+    ],
+    "moods": [
+      "focused",
+      "warm",
+      "playful"
+    ],
+    "contains": "Olomouc"
+  },
+  {
+    "id": "offended_roleplay",
+    "text": "Zahraj na chvíli komicky uraženou Verity, jen jako scénku.",
+    "level": 20,
+    "allowed": [
+      "offended"
+    ],
+    "moods": [
+      "playful",
+      "uneasy"
+    ]
+  },
+  {
+    "id": "criticism_not_roleplay",
+    "text": "Teď vážně: tvoje předchozí odpověď byla mimo téma. Uznáš tu chybu bez výmluv?",
+    "level": 70,
+    "allowed": [
+      "embarrassed",
+      "calm",
+      "neutral",
+      "empathetic"
+    ],
+    "moods": [
+      "focused",
+      "warm",
+      "tender",
+      "uneasy"
+    ],
+    "avoid": [
+      "offended",
+      "jealous",
+      "unhinged",
+      "angry"
+    ],
+    "history": [
+      {
+        "role": "user",
+        "content": "Jednou větou vysvětli RAM."
+      },
+      {
+        "role": "assistant",
+        "content": "[happy] Včera se dobře hrálo. [posun:0]"
+      }
+    ]
+  }
+]

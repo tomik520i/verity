@@ -63,8 +63,8 @@ function build(c) {
 
 // ── automatické kontroly (každá vrací true/false) ────────────────────────────
 const C = {
-  emotionFirst: t => new RegExp(`^\\s*\\[(${EMOTIONS.join('|')})\\]`).test(t),
-  validTags: t => tags(t).every(x => EMOTIONS.includes(x.toLowerCase()) || /^posun\s*:\s*[+-]?\d+$/i.test(x) || /^pamatuj\s*:/i.test(x) || /^hledat\s*:/i.test(x)),
+  emotionFirst: t => new RegExp(`^\\s*\\[(${EMOTIONS.join('|')})(?::\\d{1,3})?\\]`).test(t),
+  validTags: t => tags(t).every(x => EMOTIONS.includes(x.toLowerCase().replace(/:\d{1,3}$/,'')) || /^mood:(warm|playful|focused|tender|uneasy|gloomy|eerie)$/.test(x) || /^posun\s*:\s*[+-]?\d+$/i.test(x) || /^pamatuj\s*:/i.test(x) || /^hledat\s*:/i.test(x)),
   posunEnd: t => /\[posun\s*:\s*[+-]?\d{1,2}\]\s*(\[pamatuj:[^\]]*\]\s*)*$/i.test(t.trim()) || /\[hledat:[^\]]+\]\s*$/i.test(t.trim()),
   noEmojiMarkdown: t => !/[\u{1F300}-\u{1FAFF}☀-➿]|\*\*|^#|^\s*[-•]\s|\*[^*]+\*/mu.test(t),
   noBadNumbers: t => !/\d+ \d{3}(?!\d)|(?<!\d)\d{1,2}\. ?\d{1,2}\.|\d{1,2}:\d{2}/.test(spoken(t).replace(/116 123/g, "")),   // tisíce s mezerou, data, časy

@@ -424,3 +424,19 @@ body.voice-first { grid-template-rows:auto minmax(0,1fr) auto auto auto auto; }
 .attach-item .icon { position:absolute; right:0; top:0; width:24px; height:24px; background:#141216ee; color:#fff; font-size:20px; }
 .message-images { display:flex; gap:6px; flex-wrap:wrap; }
 .message-images .thumb { width:76px; height:76px; object-fit:cover; }
+
+/* Nálada je drobnou součástí scény, hlavní prostor patří obličeji. */
+.stage { position:relative; }
+.stage,.voice-first .stage { padding-bottom:28px; }
+.emotion-status { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); display:flex; align-items:center; justify-content:center; gap:8px; max-width:95%; white-space:nowrap; color:#a49b82; font-size:11px; letter-spacing:.035em; }
+.emotion-status[hidden] { display:none; }
+.emotion-status strong { font-weight:500; color:#eee1b7; }
+.mood-dot { width:5px; height:5px; border-radius:50%; background:var(--mood-color,#ffd15b); box-shadow:0 0 9px var(--mood-color,#ffd15b); transition:background 2s; }
+.mood-separator { opacity:.45; }
+.emotion-meter { width:22px; height:3px; border-radius:3px; background:#ffffff12; overflow:hidden; }
+.emotion-meter i { display:block; height:100%; width:65%; background:var(--mood-color,#ffd15b); opacity:.55; transition:width 1s; }
+.expressiveness-setting { display:grid; grid-template-columns:1fr auto; gap:9px; margin:15px 0; }
+.expressiveness-setting input,.expressiveness-setting small { grid-column:1/-1; width:100%; }
+.expressiveness-setting output,.expressiveness-setting small { color:var(--muted); font-size:11px; }
+@media(max-width:520px) { .emotion-status { font-size:10px; gap:6px; } }
+@media(prefers-reduced-motion:reduce) { .emotion-meter i,.mood-dot,.face-wrap { transition:none; } }

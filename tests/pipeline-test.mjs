@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),temp=await fs.mkdtemp(path.join((await import('node:os')).tmpdir(),'verity-pipeline-'));
 await fs.mkdir(temp,{recursive:true});
 await fs.mkdir(path.join(temp,'public'),{recursive:true});
-for(const f of ['server.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs','public/image-limits.mjs'])await fs.copyFile(path.join(root,f),path.join(temp,f));
+for(const f of ['server.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs','public/image-limits.mjs','public/emotions.json'])await fs.copyFile(path.join(root,f),path.join(temp,f));
 const python=process.argv[2];
 await fs.writeFile(path.join(temp,'search.py'),"import json,sys,os,time\nq=sys.argv[1]\nwith open(os.path.join(os.path.dirname(__file__),'calls.txt'),'a') as f:f.write('search\\n')\nif 'CEKEJ' in q:time.sleep(10)\nprint(json.dumps({'results':[],'error':'timeout'} if 'SELHANI' in q else {'results':[{'title':'Fixture','url':'https://fixture.invalid','snippet':'ověřený výsledek'}]}))\n");
 let replies=[],calls=[],closed=0;
@@ -73,6 +73,7 @@ try{
   assert.match(events.filter(e=>e.t).map(e=>e.t).join(''),/Rozumím/);
   assert.ok(events.some(e=>e.done),c.text);
   assert.match(calls[before].messages.at(-1).content,/Web pro tuto odpověď: vypnutý/);
+  if(c.text.startsWith('Proč zase hledáš'))assert.match(calls[before].messages.at(-1).content,/Tahle zpráva je skutečná výtka/);
  }
  // Dva pokusy modelu skončí obyčejnou náhradní větou; žádný třetí pokus ani síť.
  replies=[{text:'[hledat: první]'}, {text:'[hledat: druhý]'}];n=await searchN();before=calls.length;

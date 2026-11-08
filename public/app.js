@@ -1,14 +1,14 @@
 import { CaptionState } from './captions.mjs?v=20261108-5';
 import { roleplayPreference } from './conversation-mode.mjs?v=20261108-2';
 import { applyVoiceDefaults, microphoneLabel, needsEchoFallback, microphoneError } from './voice-preferences.mjs?v=20261108-2';
-import { Face } from './face.js';
+import { Face } from './face.js?v=20261108-9';
+import {createPerformanceParser} from './performance-parser.mjs?v=20261108-9';
 import { normalizeMemory, pruneMemory, applyOperations, removeEntry, manualEntry, contextMessages } from './memory-core.mjs?v=20261108-1';
 import { setupPhoto } from './photo.js?v=20261108-6';
 import { MAX_IMAGES, requestImages } from './image-limits.mjs';
 import { describeActivity } from './activity.js?v=20261107-7';
 
-const EMOTIONS = ['neutral', 'happy', 'excited', 'curious', 'love', 'shy', 'sad',
-  'lonely', 'scared', 'jealous', 'angry', 'unhinged', 'whisper'];
+const expressionCatalog = await (await fetch(new URL('./emotions.json?v=20261108-9',import.meta.url))).json();
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -23,7 +23,16 @@ const store = {
 applyVoiceDefaults(store);
 
 const captions = new CaptionState();
-const face = new Face($('face'));
+const face = new Face($('face'),{catalog:expressionCatalog});
+face.motion=clamp(store.get('expressiveness',85)/100,0,1);
+face.idleEnabled=store.get('idleAnimations',true);
+face.onExpression=state=>{
+  $('emotion-name').textContent=state.label; $('emotion-mood').textContent=state.moodLabel;
+  $('emotion-status').style.setProperty('--mood-color',state.color);
+  $('emotion-strength').style.width=Math.round(state.intensity*100)+'%';
+  $('emotion-status').title='Výraz: '+state.label+'. Rozpoložení: '+state.moodLabel+'. Intenzita '+Math.round(state.intensity*100)+' %.';
+};
+face.onExpression(face.expression.describe());
 let history = store.get('history', []);
 // Verze 2: originál před převodem zůstává lokálně v záloze.
 const oldMemory = store.get('memory', {});
@@ -59,10 +68,11 @@ let lastUserAt = Date.now(), lastVerityAt = Date.now(), idleCount = 0, tabLeaves
 function setInstability(v) {
   instability = clamp(Math.round(v), 0, 100);
   store.set('inst', instability);
-  face.instability = instability;
-  document.documentElement.style.setProperty('--inst', (instability / 100).toFixed(2));
-  document.body.classList.toggle('dread', instability > 55);
-  $('msg').placeholder = instability < 30 ? 'Napiš mi něco…' : instability < 55 ? 'Jsi tam?' : instability < 80 ? 'Neodcházej…' : 'ZŮSTAŇ.';
+  face.instability = roleplayPaused ? 0 : instability;
+  const visualInstability=face.instability;
+  document.documentElement.style.setProperty('--inst', (visualInstability / 100).toFixed(2));
+  document.body.classList.toggle('dread', visualInstability > 55);
+  $('msg').placeholder = visualInstability < 30 ? 'Napiš mi něco…' : visualInstability < 55 ? 'Jsi tam?' : visualInstability < 80 ? 'Neodcházej…' : 'ZŮSTAŇ.';
   $('meter-fill').style.width = instability + '%';
   $('meter-val').textContent = instability;
 }
@@ -148,11 +158,11 @@ function musicFrame(now) {
 requestAnimationFrame(musicFrame);
 
 const ttsControllers = new Set();
-async function fetchTts(text, emotion) {
+async function fetchTts(text, emotion, intensity=.65) {
   if (!voiceOn || !ttsOk || !actx) return null;
   const controller = new AbortController(); ttsControllers.add(controller);
   try {
-    const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, emotion }), signal: controller.signal });
+    const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, emotion, intensity }), signal: controller.signal });
     if (!r.ok) { activity.voiceFailed = true; return null; }
     return await actx.decodeAudioData(await r.arrayBuffer());
   } catch (error) { if (!controller.signal.aborted) activity.voiceFailed = true; throw error; }
@@ -218,14 +228,14 @@ let ttsChain = Promise.resolve(), bubble = null, doneWaiters = [], epoch = 0, wa
 const interruptibleSleep = ms => new Promise(r => { const t = setTimeout(r, ms); wakeSleep = () => { clearTimeout(t); r(); }; });
 function enqueue(seg) {
   seg.epoch = epoch;
-  const p = ttsChain.then(() => (seg.epoch === epoch ? fetchTts(seg.text, seg.emotion) : null)).catch(() => null);
+  const p = ttsChain.then(() => (seg.epoch === epoch ? fetchTts(seg.text, seg.emotion,seg.intensity) : null)).catch(() => null);
   ttsChain = p;
   seg.audio = p;
   queue.push(seg);
   if (!playing) playLoop();
 }
 function stopSpeech() {
-  epoch++;
+  epoch++; face.speaking=false; face.cancelGesture();
   echoOutput?.flush();
   for (const controller of ttsControllers) controller.abort();
   ttsControllers.clear();
@@ -243,19 +253,20 @@ async function playLoop() {
     const seg = queue.shift();
     const buf = await seg.audio;
     if (seg.epoch !== epoch) continue;
-    if (!buf) spokenSoFar.push(`[${seg.emotion}] ${seg.text}`);
+    if (!buf) spokenSoFar.push(`[${seg.emotion}:${Math.round(seg.intensity*100)}][mood:${seg.mood}] ${seg.text}`);
     face.thinking = false;
-    face.setEmotion(seg.emotion);
+    face.perform(seg); face.speaking=true;
     if (!bubble) bubble = addLog('verity', '');
     bubble.firstChild.textContent += (bubble.firstChild.textContent ? ' ' : '') + seg.text;
     scrollLog();
     const dur = buf ? buf.duration * 1000 : Math.max(1100, seg.text.length * 55);
     showSubtitle(seg.text, dur);
-    if (buf) { await playBuffer(buf); if (seg.epoch === epoch) spokenSoFar.push(`[${seg.emotion}] ${seg.text}`); }
+    if (buf) { await playBuffer(buf); if (seg.epoch === epoch) spokenSoFar.push(`[${seg.emotion}:${Math.round(seg.intensity*100)}][mood:${seg.mood}] ${seg.text}`); }
     else { fakeTalkUntil = performance.now() + dur * 0.85; await interruptibleSleep(dur); }
+    face.speaking=false;
     await interruptibleSleep(120);
   }
-  playing = false;
+  playing = false; face.speaking=false;
   doneWaiters.splice(0).forEach(f => f());
 }
 const playbackDone = () => (playing || queue.length ? new Promise(r => doneWaiters.push(r)) : Promise.resolve());
@@ -269,48 +280,8 @@ function showSubtitle(text) {
 }
 
 // ── parser streamu: značky emocí, [posun:N], dělení na věty ──────────────────
-function makeParser(onSegment, onShift, onFact) {
-  let pending = '', cur = '', emotion = face.emotion === 'neutral' ? 'neutral' : face.emotion;
-  const emit = (force) => {
-    for (;;) {
-      const m = cur.match(/^(.*?[.!?…]+["“”»]?)\s+(.*)$/s);
-      if (!m) break;
-      if (m[1].length < 18 && !force) {
-        // příliš krátké – zkus najít další hranici
-        const rest = m[2].match(/^(.*?[.!?…]+["“”»]?)\s+(.*)$/s);
-        if (!rest) break;
-        onSegment({ text: (m[1] + ' ' + rest[1]).trim(), emotion }); cur = rest[2];
-        continue;
-      }
-      onSegment({ text: m[1].trim(), emotion }); cur = m[2];
-    }
-    if (force && /[\p{L}\p{N}]/u.test(cur)) { onSegment({ text: cur.trim(), emotion }); cur = ''; }
-  };
-  const text = t => { cur += t; emit(false); };
-  return {
-    feed(chunk) {
-      pending += chunk;
-      for (;;) {
-        const i = pending.indexOf('[');
-        if (i < 0) { text(pending); pending = ''; return; }
-        if (i > 0) { text(pending.slice(0, i)); pending = pending.slice(i); }
-        const j = pending.indexOf(']');
-        if (j < 0) { if (pending.length > 200) { pending = pending.slice(1); continue; } return; }
-        const rawTag = pending.slice(1, j).trim(), tag = rawTag.toLowerCase(); pending = pending.slice(j + 1);
-        const fact = rawTag.match(/^pamatuj\s*:\s*(.+)$/i);
-        if (fact) { continue; } // Značka asistenta není důkaz o člověku.
-        const forget = rawTag.match(/^zapome[nň]\s*:\s*(.+)$/i);
-        if (forget) { continue; }
-        const shift = tag.match(/^posun\s*:\s*([+-]?\d+)/);
-        if (shift) { onShift(clamp(+shift[1], -15, 15)); continue; }
-        if (EMOTIONS.includes(tag)) {
-          if (tag !== emotion) { emit(true); emotion = tag; }
-          if (!queue.length && !playing) face.setEmotion(tag);
-        }
-      }
-    },
-    end() { if (pending && !pending.startsWith('[')) text(pending); pending = ''; emit(true); },
-  };
+function makeParser(onSegment,onShift) {
+  return createPerformanceParser({catalog:expressionCatalog,onSegment,onShift});
 }
 
 // ── log ──────────────────────────────────────────────────────────────────────
@@ -335,6 +306,7 @@ function buildState(extra = {}) {
   return {
     ...extra,
     instability, visits, tabLeaves, roleplayPaused,
+    mood:roleplayPaused?'warm':face.expression.mood,
     localTime: now.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) + ', ' + now.toLocaleDateString('cs-CZ'),
     weekday: now.toLocaleDateString('cs-CZ', { weekday: 'long' }),
     hoursSinceLastVisit: lastSeen ? Math.round((Date.now() - lastSeen) / 36e5) : null,
@@ -355,7 +327,7 @@ function interrupt() {
 
 async function converse(content, isEvent = false, extra = {}, photos = []) {
   if (busy || micTestMode) return;
-  if (!isEvent) { roleplayPaused = roleplayPreference(content,roleplayPaused); store.set('roleplayPaused',roleplayPaused); $('opt-roleplay').checked = !roleplayPaused; }
+  if (!isEvent) { roleplayPaused = roleplayPreference(content,roleplayPaused); store.set('roleplayPaused',roleplayPaused); $('opt-roleplay').checked = !roleplayPaused; setInstability(instability); }
   captions.beginReply();
   $('subtitle').textContent = 'Připravuji odpověď…';
   $('subtitle').classList.add('placeholder');
@@ -648,7 +620,7 @@ function micUi(on) {
   $('mic').setAttribute('aria-pressed', on);
   $('msg').readOnly = on;           // během nahrávání by přepis přepsal ruční úpravy
   face.listening = on;
-  if (!on) face.hear = 0;
+  if (!on) {face.hear = 0;face.userSpeaking=false;}
 }
 const listeningText = () => (convMode ? 'Konverzace – poslouchám, odešlu po pauze' : autoSend ? 'Poslouchám… odešlu po pauze' : 'Poslouchám… (Odeslat nebo znovu mikrofon)');
 async function startMic({ fromConv = false } = {}) {
@@ -676,6 +648,7 @@ async function startMic({ fromConv = false } = {}) {
       onState: (m, err) => { if (generation === micGeneration) micState(m, err); },
       onLevel: v => {
         if (generation !== micGeneration) return;
+        face.userSpeaking=!!v.speaking;
         face.hear += ((v.speaking ? v.level : v.level * 0.3) - face.hear) * 0.4;
         if (v.speaking) lastUserAt = Date.now();
         vadMeter(v);
@@ -820,6 +793,7 @@ async function startLive() {
       onLevel: v => {
         if (generation !== liveGeneration) return;
         vadMeter(v);
+        face.userSpeaking=!!v.speaking;
         face.hear += ((v.speaking ? v.level : 0) - face.hear) * 0.4;
         if (v.speaking) lastUserAt = Date.now();
         $('live-takeover').disabled = !busy && !playing && !current;
@@ -981,7 +955,7 @@ window.addEventListener('beforeunload', e => {
 // při systémovém omezení pohybu.
 let noFlash = store.get('noFlash', false);
 const flashOff = () => noFlash || reducedMotion.matches;
-function applyNoFlash() { document.body.classList.toggle('noflash', flashOff()); }
+function applyNoFlash() { document.body.classList.toggle('noflash', flashOff()); face.reducedMotion=reducedMotion.matches;face.noFlash=flashOff(); }
 applyNoFlash();
 reducedMotion.addEventListener?.('change', applyNoFlash);
 $('opt-noflash').checked = flashOff();
@@ -1135,7 +1109,12 @@ $('music-vol').value = musicVol;
 $('music-vol').oninput = e => { musicVol = +e.target.value; store.set('musicVol', musicVol); };
 // přemýšlení (reasoning): auto / off / on
 $('opt-roleplay').checked = !roleplayPaused;
-$('opt-roleplay').onchange = e => { roleplayPaused = !e.target.checked; store.set('roleplayPaused',roleplayPaused); };
+$('opt-roleplay').onchange = e => { roleplayPaused = !e.target.checked; store.set('roleplayPaused',roleplayPaused); setInstability(instability); if(roleplayPaused)face.perform({emotion:'calm',mood:'warm',intensity:.45}); };
+$('opt-idle-animations').checked=face.idleEnabled;
+$('opt-idle-animations').onchange=e=>{face.idleEnabled=e.target.checked;store.set('idleAnimations',face.idleEnabled);face.idle.cancel(performance.now());};
+$('opt-expressiveness').value=Math.round(face.motion*100);
+$('expressiveness-value').textContent=Math.round(face.motion*100)+' %';
+$('opt-expressiveness').oninput=e=>{const value=clamp(Number(e.target.value),0,100);face.motion=value/100;store.set('expressiveness',value);$('expressiveness-value').textContent=value+' %';};
 $('opt-think').value = thinkMode;
 $('opt-think').onchange = e => { thinkMode = e.target.value; store.set('think', thinkMode); };
 $('music-dance').checked = danceOn;
@@ -1209,6 +1188,8 @@ fitViewport();
 // Samostatný viditelný ukazatel. DOM měníme jen při změně stavu (i pro čtečky obrazovky).
 let lastActivityView = '';
 function renderVoiceControls() {
+  face.awake=awake; face.attending=micTestMode||photoPreparing||(document.activeElement===$('msg')&&!!$('msg').value.trim());
+  $('emotion-status').hidden=!awake;
   const active = !!(mic || liveSession), starting = micStarting || liveStarting;
   const label = micTestMode ? 'Test v nastavení' : microphoneLabel({liveMode,active,starting,finishing:micFinishing,supported:micSupported});
   $('mic-caption').textContent = label;

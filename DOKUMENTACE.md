@@ -75,7 +75,7 @@ V živém hovoru režim přemýšlení „automaticky“ upřednostňuje rychlou
 | POST api/chat | Zprávy, paměť, stav, images (až 10 data URL); odpověď SSE |
 | POST api/memory | Návrh ověřených změn paměti z lidské zprávy |
 | POST api/summarize | Kompakce paměti s validací |
-| POST api/tts | Text a emoce → WAV |
+| POST api/tts | Text, emoce a intenzita → WAV |
 | POST api/stt | WAV → český přepis |
 | POST api/consolidate | Sloučení ověřené paměti |
 
@@ -147,7 +147,8 @@ Model vrací text se značkami, které se nečtou nahlas.
 
 | Značka | Úloha a kontrola |
 | --- | --- |
-| [neutral], [happy], [excited], [curious], [love], [shy], [sad], [lonely], [scared], [jealous], [angry], [unhinged], [whisper] | Emoce aktuálního segmentu; změna emoce ukončí rozpracovaný segment |
+| [emoce:intenzita], např. [amused:65] | 29 výrazů v public/emotions.json; intenzita 20–100. Starý formát [happy] stále funguje. Změna ukončí segment. |
+| [mood:warm] | Dlouhodobější nálada: warm, playful, focused, tender, uneasy, gloomy, eerie. Nečte se nahlas. |
 | [posun:N] | Změna nestability, omezená aplikací; u výsledků hledání se výstup normalizuje na posun 0 |
 | [hledat: dotaz] | Zachytí server. Bez aktuálního oprávnění hledat se příslib i značka zahodí a následuje omezená oprava běžné odpovědi |
 | [pamatuj: ...], [zapomeň: ...] | Starý protokol; dnes se ignoruje a nesmí měnit paměť |
@@ -210,7 +211,7 @@ Každá událost má formát data: JSON a dva konce řádku. Klient drží neúp
 
 ### Hlasové služby
 
-POST api/tts přijímá text a emotion a vrací WAV. Proxy odstraní značky, složí parametry z konfigurace a přidá tempo či referenci emoce. Interní OmniVoice HTTP obal očekává:
+POST api/tts přijímá text, emotion a volitelnou intensity (0–1, výchozí 0,65) a vrací WAV. Proxy odstraní značky, složí parametry z konfigurace a přidá tempo či referenci emoce. Interní OmniVoice HTTP obal očekává:
 
 ```json
 {
@@ -303,8 +304,14 @@ Celý zbytek aplikace s obličejem mluví jen přes tyto vlastnosti a metody tř
 
 | Člen | Typ | Kdo nastavuje | Význam |
 |---|---|---|---|
-| `new Face(hostElement)` | konstruktor | app.js | vykreslí se do `#face`, sama si pustí `requestAnimationFrame` smyčku |
-| `setEmotion(name)` | metoda | app.js | jedna z 13 emocí; přechod má být plynulý (+ krátký „pop“) |
+| `new Face(hostElement, {catalog, ambient})` | konstruktor | app.js | vykreslí se do `#face`, sama si pustí `requestAnimationFrame` smyčku |
+| `setEmotion(name)` | metoda | app.js | jedna z 29 emocí; kompatibilní zkratka pro perform |
+| `perform({emotion,intensity,mood})` | metoda | přehrávač | výraz, nálada a gesto současně s konkrétním segmentem |
+| `cancelGesture()` | metoda | přerušení řeči | zahodí probíhající gesto |
+| `expression.describe()` | metoda | UI a kontext | popis výrazu a nálady |
+| `motion`, `idleEnabled`, `awake`, `attending` | 0–1 / bool | app.js | živost, povolení idle, probuzení a aktivní interakce |
+| `speaking`, `noFlash`, `reducedMotion` | bool | app.js | přehrávání a omezení efektů |
+| `onExpression(state)` | callback | face.js → app.js | aktualizace malého ukazatele nálady |
 | `instability` | 0–100 | app.js | deformace každé emoce (viz níže) |
 | `talk` | 0–1 | lip sync, ~60×/s | otevření pusy podle hlasitosti |
 | `round` | 0–1 | lip sync | 1 = kulatá samohláska (o/u), 0 = široká (e/i) |
@@ -331,22 +338,39 @@ Všechny rysy jsou spojité parametry, každý snímek se interpolují k cíli (
 
 Ústa jsou dvě kvadratické Bézierovy křivky: koutky `y = base − curve/2`, horní ret řídicí bod `base + 1,5·curve`, dolní `+ 2·open`. Zuby jsou vzorek ořezaný tvarem úst.
 
-Hodnoty emocí (rozdíl proti základu `erx16 ery26 w46 curve16`):
+Hodnoty emocí jsou ve společném katalogu public/emotions.json. Intenzita a pozvolná nálada je skládají s výchozí pózou. Úplný popis vzhledu, použití a klidových režimů: [docs/EMOCE.md](docs/EMOCE.md).
 
-| Emoce | Klíčové hodnoty |
-|---|---|
-| happy | ery22 w58 curve30 open6 glow1.2 bob1.4 |
-| excited | ery30 w66 curve34 open20 bob2.2 scale1.04 |
-| curious | eryL−8 brow−6 w26 curve6 tilt9 |
-| love | ery19 w50 curve26 blush1 tilt−5 |
-| shy | lookX−7 lookY5 w24 curve10 blush.85 tilt−8 |
-| sad | lookY6 brow−22 w34 curve−16 dim.25 |
-| lonely | lookY9 brow−16 w26 curve−8 dim.4 scale.95 |
-| scared | erx13 ery33 brow−18 curve−6 open14 shake.8 |
-| jealous | ery12 lookX8 brow14 red.2 |
-| angry | ery14 brow28 curve−12 open7 red.45 shake1.6 |
-| unhinged | erx10 ery31 w104 curve46 open26 teeth1 red1 shake1.3 |
-| whisper | ery15 w22 curve8 open6 dim.35 scale1.08 |
+| Emoce | Gesto | Cílové hodnoty proti základu |
+|---|---|---|
+| neutral | settle | výchozí póza |
+| happy | nod | ery:22 w:58 curve:34 open:13 glow:1.2 bob:1.1 smileEye:1 |
+| excited | perk | erx:18 ery:30 w:66 curve:34 open:28 glow:1.4 bob:1.5 scale:1.04 sparkle:1 starEye:1 |
+| curious | tilt | ery:28 eryL:-8 brow:-6 browOp:0.7 w:26 curve:6 open:4 tilt:9 |
+| love | soften | ery:19 w:50 curve:26 open:4 blush:1 glow:1.3 tilt:-5 smileEye:0.4 heartEye:1 |
+| shy | avert | ery:20 lookX:-7 lookY:5 w:24 curve:10 blush:1 tilt:-8 scale:0.97 sweat:0.3 |
+| sad | bow | ery:22 lookY:6 brow:-22 browOp:1 w:34 curve:-16 glow:0.7 dim:0.25 bob:0.5 tear:0.8 watery:1 |
+| lonely | bow | ery:21 lookY:9 lookX:4 brow:-16 browOp:0.8 w:26 curve:-8 glow:0.5 dim:0.4 bob:0.4 scale:0.95 |
+| scared | recoil | erx:22 ery:38 brow:-18 browOp:0.9 w:22 curve:-6 open:32 shake:0.5 glow:0.8 sweat:1 shock:1 |
+| jealous | sideeye | ery:12 lookX:8 brow:14 browOp:0.8 w:40 curve:6 red:0.2 tilt:4 mouthBias:5 |
+| angry | shake | ery:14 brow:36 browOp:1 w:44 curve:-12 open:7 red:0.45 shake:0.6 glow:1.1 anger:1 puff:0.55 |
+| unhinged | still | erx:10 ery:31 w:100 curve:44 open:24 teeth:1 red:1 shake:0.7 glow:1.4 scale:1.04 browAsym:5 |
+| whisper | lean | ery:15 lookY:3 w:22 curve:8 open:6 glow:0.6 dim:0.35 scale:1.08 bob:0.3 |
+| calm | settle | ery:22 w:43 curve:15 glow:1.05 bob:0.6 smileEye:0.15 |
+| amused | chuckle | ery:17 w:63 curve:31 open:25 smileEye:1.2 browOp:0.3 blush:0.15 tilt:-4 |
+| proud | perk | ery:20 w:58 curve:25 browOp:0.5 brow:3 lookY:-3 scale:1.025 sparkle:0.7 mouthBias:8 |
+| relieved | exhale | ery:19 w:47 curve:21 brow:-7 browOp:0.55 smileEye:0.7 bob:0.7 |
+| grateful | nod | ery:21 w:45 curve:23 blush:0.6 tilt:-3 glow:1.15 smileEye:0.3 watery:0.4 |
+| empathetic | soften | ery:24 brow:-15 browOp:0.8 w:35 curve:7 tilt:-5 glow:0.9 bob:0.5 watery:0.45 |
+| worried | tilt | ery:28 brow:-23 browOp:1 w:30 curve:-5 lookY:1 tilt:4 dim:0.08 sweat:0.55 |
+| confused | tilt | ery:24 eryL:-8 brow:-4 browAsym:20 browOp:1 w:30 curve:1 mouthBias:7 tilt:10 question:1 |
+| skeptical | sideeye | ery:15 eryL:5 brow:3 browAsym:23 browOp:1 w:35 curve:3 mouthBias:9 lookX:5 tilt:-5 flatEye:0.8 |
+| surprised | recoil | erx:25 ery:39 brow:-16 browOp:0.9 w:24 curve:0 open:37 scale:1.02 shock:1 |
+| embarrassed | avert | ery:20 eryL:3 brow:-7 browAsym:9 browOp:0.75 w:35 curve:9 mouthBias:8 blush:1 lookY:6 tilt:-7 sweat:1 flatEye:0 |
+| determined | nod | ery:21 brow:13 browOp:0.85 w:44 curve:10 lookY:-1 scale:1.02 glow:1.1 sparkle:0.4 |
+| disappointed | exhale | ery:15 brow:-12 browOp:0.8 w:38 curve:-8 lookY:5 dim:0.16 bob:0.5 flatEye:1 |
+| playful | wink | ery:22 eryL:-6 brow:4 browAsym:8 browOp:0.65 w:54 curve:23 mouthBias:12 tilt:7 blush:0.15 smileEye:0 |
+| tired | exhale | ery:12 brow:-6 browOp:0.4 w:32 curve:4 lookY:5 dim:0.18 bob:0.4 tilt:-3 flatEye:1 |
+| offended | huff | ery:12 lookX:17 brow:14 browOp:1 w:22 curve:-10 open:1 mouthBias:4 blush:0.4 tilt:-12 puff:1 |
 
 Nestabilita navíc: `w += i·34`, `curve += i·12`, `red ≥ (inst−45)/55`, `teeth ≥ (inst−70)/30`, víc třesu nad 60; mrkání je tím vzácnější, čím vyšší nestabilita (zírá). Barva těla se míchá ze žluté do tmavě oranžovo-rudé podle `red·0,7 + dim`.
 
@@ -428,3 +452,12 @@ curl -s localhost:3700/api/tts -H 'Content-Type: application/json' -d '{"text":"
 9. Mikrofon: PCM přes AudioWorklet a **samostatné WAV snímky**, ne kusy z MediaRecorderu; jeden přepis najednou; závěrečný průchod přesnější než průběžný.
 10. **Přerušení přes epochy**: každá odpověď má číslo, zastavení ho zvýší a vše opožděné ze staré odpovědi se zahodí. Do historie ukládej jen to, co postava opravdu řekla.
 11. Za reverzní proxy ber IP klienta z `X-Forwarded-For`, jinak limity platí pro všechny dohromady.
+
+
+## Anime herectví a klidové režimy (8. 11. 2026)
+
+Tři vrstvy: Gemma volí krátký výraz a intenzitu; ExpressionState plynule mění náladu; Face přidává lokální choreografii a lip sync. IdleDirector nekomunikuje se serverem. Protokol i výchozí rychlosti hlasu používají společný katalog. Při skutečné výtce server přidá věcný pokyn do kontextu, aby nová uraženost nepřebila uznání chyby. Nejde o bezchybný klasifikátor.
+
+Průběžný parser uchovává značky i přes hranice síťových chunků. Přehrávač přepne výraz teprve po přípravě audia a kontrole aktuální epochy, při přerušení zahodí čekající segmenty i gesta. Textový režim používá stejné segmenty. Přehled a reprodukovatelné testy: [Emoce](docs/EMOCE.md), [Simulace](docs/EMOCE-A-SIMULACE.md).
+
+Nastavení verity.expressiveness (0–100, výchozí 85) a verity.idleAnimations (výchozí true) se ukládá přes existující localStorage store v prohlížeči; při nedostupném úložišti použije výchozí hodnoty. Bez blikání a systémové omezení pohybu mají přednost.
