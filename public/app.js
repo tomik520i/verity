@@ -1,5 +1,9 @@
+import { roleplayPreference } from './conversation-mode.mjs?v=20261108-2';
+import { applyVoiceDefaults, microphoneLabel, needsEchoFallback, microphoneError } from './voice-preferences.mjs?v=20261108-2';
 import { Face } from './face.js';
+import { normalizeMemory, pruneMemory, applyOperations, removeEntry, manualEntry, contextMessages } from './memory-core.mjs?v=20261108-1';
 import { setupPhoto } from './photo.js';
+import { describeActivity } from './activity.js?v=20261107-7';
 
 const EMOTIONS = ['neutral', 'happy', 'excited', 'curious', 'love', 'shy', 'sad',
   'lonely', 'scared', 'jealous', 'angry', 'unhinged', 'whisper'];
@@ -11,31 +15,41 @@ const stripTags = s => s.replace(/\[[^\]]{0,200}\]/g, '').replace(/\s+/g, ' ').t
 // ── perzistence (jen pohodlí v prohlížeči; vše je obalené try/catch) ─────────
 const store = {
   get(k, d) { try { const v = localStorage.getItem('verity.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('verity.' + k, JSON.stringify(v)); } catch { /* private mode */ } },
+  set(k, v) { try { localStorage.setItem('verity.' + k, JSON.stringify(v)); return true; } catch { return false; } },
 };
+
+applyVoiceDefaults(store);
 
 const face = new Face($('face'));
 let history = store.get('history', []);
-// Dlouhodobá paměť: fakta (Verity si je zapisuje sama), deník (shrnutí starších úseků)
-// a začátek pracovního okna – modelu jde jen history.slice(windowStart).
-const memory = Object.assign({ facts: [], diary: [], windowStart: Math.max(0, history.length - 40) }, store.get('memory', {}));
-memory.windowStart = Math.min(memory.windowStart, history.length);
-const WINDOW_MAX = 80, WINDOW_CHUNK = 40, HISTORY_CAP = 5000;
-const saveMemory = () => store.set('memory', memory);
-function saveHistory() {
-  if (history.length > HISTORY_CAP) {
-    const drop = history.length - HISTORY_CAP;
-    history = history.slice(drop); memory.windowStart = Math.max(0, memory.windowStart - drop); saveMemory();
+// Verze 2: originál před převodem zůstává lokálně v záloze.
+const oldMemory = store.get('memory', {});
+const backupReady = oldMemory.version === 2 || !Object.keys(oldMemory).length ||
+  !!store.get('memory-backup-v1',null) || store.set('memory-backup-v1',{at:Date.now(),memory:oldMemory});
+const memory = normalizeMemory(oldMemory);
+memory.windowStart=Math.min(memory.windowStart,history.length);
+memory.sessionStart=Math.min(memory.sessionStart,history.length);
+const WINDOW_MAX=60, WINDOW_CHUNK=30, HISTORY_CAP=5000;
+const saveMemory=()=>{pruneMemory(memory);if(backupReady)store.set('memory',memory);};
+saveMemory();
+function saveHistory(){
+  if(history.length>HISTORY_CAP){
+    const drop=history.length-HISTORY_CAP;history=history.slice(drop);
+    memory.windowStart=Math.max(0,memory.windowStart-drop);
+    memory.sessionStart=Math.max(0,memory.sessionStart-drop);saveMemory();
   }
-  store.set('history', history);
+  store.set('history',history);
 }
 let instability = store.get('inst', 0);
 let visits = store.get('visits', 0);
 const lastSeen = store.get('lastSeen', null);
 let voiceOn = store.get('voice', true);
 let thinkMode = store.get('think', 'auto');
+let roleplayPaused = store.get('roleplayPaused',false);
 let ttsOk = false, llmOk = false, sttOk = false;
 let awake = false, busy = false, playing = false;
+const activity = { streaming: false, search: '', reasoning: false, hasText: false,
+  outcome: 'idle', failure: '', inputError: '', voiceFailed: false, memoryTasks: 0, memoryError: false };
 let lastUserAt = Date.now(), lastVerityAt = Date.now(), idleCount = 0, tabLeaves = 0, hiddenAt = null;
 
 // ── nestabilita / pouto ──────────────────────────────────────────────────────
@@ -125,23 +139,71 @@ function musicFrame(now) {
   const bpm = music.tempo || 120;
   face.musicPhase = 2 * Math.PI * music.el.currentTime * (bpm / 60) / 2;   // polovina tempa
   // když Verity mluví, hudba se ztlumí na 30 %
-  const target = musicVol * (current ? 0.3 : 1);
+  const target = musicVol * (mic || micStarting || micFinishing || liveSession || liveStarting ? 0 : current ? 0.3 : 1);
   music.gain.gain.value += (target - music.gain.gain.value) * 0.08;
 }
 requestAnimationFrame(musicFrame);
 
+const ttsControllers = new Set();
 async function fetchTts(text, emotion) {
   if (!voiceOn || !ttsOk || !actx) return null;
-  const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, emotion }) });
-  if (!r.ok) return null;
-  return actx.decodeAudioData(await r.arrayBuffer());
+  const controller = new AbortController(); ttsControllers.add(controller);
+  try {
+    const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, emotion }), signal: controller.signal });
+    if (!r.ok) { activity.voiceFailed = true; return null; }
+    return await actx.decodeAudioData(await r.arrayBuffer());
+  } catch (error) { if (!controller.signal.aborted) activity.voiceFailed = true; throw error; }
+  finally { ttsControllers.delete(controller); }
 }
+let echoOutput = null, echoRouteAbort = null;
+function releaseEchoOutput() {
+  echoRouteAbort?.abort(); echoRouteAbort = null;
+  if (!echoOutput) return;
+  analyser.disconnect(); echoOutput.close(); echoOutput = null;
+  analyser.connect(actx.destination);
+}
+function fallbackEchoMode() {
+  outputMode = 'speakers'; store.set('outputMode',outputMode);
+  releaseEchoOutput(); outputModeUi();
+}
+function confirmEchoMode(engine) {
+  if (!needsEchoFallback(outputMode,engine.echoCancellation)) return false;
+  fallbackEchoMode();
+  if (current) engine.suppress();
+  return true;
+}
+async function prepareEchoOutput() {
+  if (outputMode !== 'aec') { releaseEchoOutput(); return; }
+  if (echoOutput) return;
+  const controller = echoRouteAbort = new AbortController();
+  try {
+    const { createEchoOutput } = await import('./echo-output.js?v=20261107-6');
+    if (controller.signal.aborted) throw new DOMException('Ukončeno','AbortError');
+    const bridge = await createEchoOutput(actx, { signal:controller.signal, onFailure:() => {
+      fallbackEchoMode();
+      cancelMic(); stopLive({ message:'Potlačení ozvěny se odpojilo. Přepnuto na střídání; mikrofonem začni znovu.', error:true });
+    }});
+    if (controller.signal.aborted || outputMode !== 'aec') { bridge.close(); throw new DOMException('Ukončeno','AbortError'); }
+    analyser.disconnect(); analyser.connect(bridge.input); echoOutput = bridge;
+  } catch (e) {
+    if (controller.signal.aborted || e.name === 'AbortError') throw e;
+    // Bez funkční AEC nesmí reproduktor otevřít další tah rozhovoru.
+    fallbackEchoMode();
+    micState('Potlačení ozvěny není dostupné. Střídáme mluvení a poslech.');
+  }
+}
+let speakerTailUntil = 0;
+const inputSuppressed = () => outputMode === 'speakers' && (!!current || performance.now() < speakerTailUntil);
 function playBuffer(buf) {
   return new Promise(resolve => {
     const src = actx.createBufferSource();
     src.buffer = buf; src.connect(analyser);
     current = src;
-    src.onended = () => { current = null; resolve(); };
+    if (outputMode === 'speakers') { liveSession?.engine.suppress(); mic?.engine.suppress(); }
+    src.onended = () => {
+      if (current === src) { current = null; speakerTailUntil = performance.now() + 900; }
+      resolve();
+    };
     src.start();
   });
 }
@@ -161,9 +223,13 @@ function enqueue(seg) {
 }
 function stopSpeech() {
   epoch++;
+  echoOutput?.flush();
+  for (const controller of ttsControllers) controller.abort();
+  ttsControllers.clear();
+  $('subtitle').textContent = '';
   queue.length = 0;
   ttsChain = Promise.resolve();
-  if (current) { try { current.stop(); } catch { /* už dohrálo */ } }
+  if (current) { speakerTailUntil = performance.now() + 900; try { current.stop(); } catch { /* už dohrálo */ } }
   fakeTalkUntil = 0;
   wakeSleep?.();
 }
@@ -173,7 +239,7 @@ async function playLoop() {
     const seg = queue.shift();
     const buf = await seg.audio;
     if (seg.epoch !== epoch) continue;
-    spokenSoFar.push(`[${seg.emotion}] ${seg.text}`);
+    if (!buf) spokenSoFar.push(`[${seg.emotion}] ${seg.text}`);
     face.thinking = false;
     face.setEmotion(seg.emotion);
     if (!bubble) bubble = addLog('verity', '');
@@ -181,7 +247,7 @@ async function playLoop() {
     scrollLog();
     const dur = buf ? buf.duration * 1000 : Math.max(1100, seg.text.length * 55);
     showSubtitle(seg.text, dur);
-    if (buf) await playBuffer(buf);
+    if (buf) { await playBuffer(buf); if (seg.epoch === epoch) spokenSoFar.push(`[${seg.emotion}] ${seg.text}`); }
     else { fakeTalkUntil = performance.now() + dur * 0.85; await interruptibleSleep(dur); }
     await interruptibleSleep(120);
   }
@@ -231,9 +297,9 @@ function makeParser(onSegment, onShift, onFact) {
         if (j < 0) { if (pending.length > 200) { pending = pending.slice(1); continue; } return; }
         const rawTag = pending.slice(1, j).trim(), tag = rawTag.toLowerCase(); pending = pending.slice(j + 1);
         const fact = rawTag.match(/^pamatuj\s*:\s*(.+)$/i);
-        if (fact) { onFact(fact[1].trim()); continue; }
+        if (fact) { continue; } // Značka asistenta není důkaz o člověku.
         const forget = rawTag.match(/^zapome[nň]\s*:\s*(.+)$/i);
-        if (forget) { forgetFact(forget[1].trim()); continue; }
+        if (forget) { continue; }
         const shift = tag.match(/^posun\s*:\s*([+-]?\d+)/);
         if (shift) { onShift(clamp(+shift[1], -15, 15)); continue; }
         if (EMOTIONS.includes(tag)) {
@@ -263,7 +329,7 @@ function buildState(extra = {}) {
   const now = new Date();
   return {
     ...extra,
-    instability, visits, tabLeaves,
+    instability, visits, tabLeaves, roleplayPaused,
     localTime: now.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) + ', ' + now.toLocaleDateString('cs-CZ'),
     weekday: now.toLocaleDateString('cs-CZ', { weekday: 'long' }),
     hoursSinceLastVisit: lastSeen ? Math.round((Date.now() - lastSeen) / 36e5) : null,
@@ -276,6 +342,7 @@ let chatAbort = null, wasInterrupted = false;
 function interrupt() {
   if (!busy && !playing) return;
   wasInterrupted = true;
+  activity.outcome = 'interrupted'; activity.search = ''; activity.reasoning = false; activity.streaming = false;
   chatAbort?.abort();
   stopSpeech();
   if (bubble) bubble.firstChild.textContent += ' —';
@@ -283,28 +350,32 @@ function interrupt() {
 
 async function converse(content, isEvent = false, extra = {}, photo = null) {
   if (busy) return;
+  if (!isEvent) { roleplayPaused = roleplayPreference(content,roleplayPaused); store.set('roleplayPaused',roleplayPaused); $('opt-roleplay').checked = !roleplayPaused; }
   busy = true; $('send').disabled = true;
+  Object.assign(activity, { streaming: true, search: '', reasoning: false, hasText: false, outcome: 'pending', failure: '', inputError: '', voiceFailed: false, memoryError: false });
+  renderActivity();
   // fotka: plná velikost jde jen s touto zprávou; do historie jen značka [[FOTKA]] a miniatura
   if (photo) content += ' [[FOTKA]]';
-  history.push({ role: 'user', content, at: Date.now(), ...(photo ? { thumb: photo.thumb } : {}) });
+  const messageAt = Date.now();
+  history.push({ role: 'user', content, at: messageAt, ...(photo ? { thumb: photo.thumb } : {}) });
   saveHistory();
   if (!isEvent) addLog('user', content, photo?.thumb);
   face.thinking = true;
   bubble = null; spokenSoFar = [];
   let raw = '', sources = null;
   const controller = chatAbort = new AbortController();
-  const added = [];   // fakta zapsaná v této odpovědi → po ní úklid paměti (consolidateMemory)
-  const parser = makeParser(seg => { if (!controller.signal.aborted) enqueue(seg); }, d => setInstability(instability + d),
-    f => { const before = memory.facts.length; rememberFact(f); if (memory.facts.length > before) added.push(memory.facts.at(-1)); });
+  const parser = makeParser(seg => { if (!controller.signal.aborted) enqueue(seg); }, d => setInstability(instability + d));
   const interruptedBefore = wasInterrupted; wasInterrupted = false;
   try {
+    if (!isEvent) await updateMemory(content, messageAt, controller.signal);
+    if (controller.signal.aborted) throw new DOMException('Přerušeno', 'AbortError');
     const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
       body: JSON.stringify({
-        messages: history.slice(memory.windowStart).map(({ role, content }) => ({ role, content })),
-        memory: { facts: memory.facts, diary: memory.diary.map(d => d.text) },
+        messages: contextMessages(history, memory).map(({ role, content }) => ({ role, content })),
+        memory,
         state: buildState({ ...extra, interrupted: interruptedBefore }),
         ...(photo ? { image: photo.image } : {}),
-        thinking: thinkMode,
+        thinking: extra.liveVoice && thinkMode === 'auto' ? 'off' : thinkMode,
       }) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const reader = r.body.getReader(), dec = new TextDecoder();
@@ -317,13 +388,10 @@ async function converse(content, isEvent = false, extra = {}, photo = null) {
       while ((k = buf.indexOf('\n\n')) >= 0) {
         const line = buf.slice(0, k).replace(/^data:\s*/, ''); buf = buf.slice(k + 2);
         let ev; try { ev = JSON.parse(line); } catch { continue; }
-        if (ev.t) { raw += ev.t; parser.feed(ev.t); }
-        if (ev.search) { face.searching = true; $('search-line').textContent = 'hledá: ' + ev.search; $('search-line').hidden = false; }
-        if ('thinking' in ev) {   // model přemýšlí (reasoning) – jen nenápadný údaj, nic se nečte nahlas
-          if (ev.thinking) { $('search-line').textContent = 'přemýšlí…'; $('search-line').hidden = false; }
-          else if ($('search-line').textContent === 'přemýšlí…') $('search-line').hidden = true;
-        }
-        if (ev.sources) { sources = ev.sources; face.searching = false; $('search-line').hidden = true; }
+        if (ev.t) { activity.hasText = true; raw += ev.t; parser.feed(ev.t); }
+        if (ev.search) { activity.search = String(ev.search); face.searching = true; }
+        if ('thinking' in ev) activity.reasoning = !!ev.thinking;
+        if (ev.sources) { activity.search = ''; sources = ev.sources; face.searching = false; }
         if (ev.error) throw new Error(ev.error);
       }
     }
@@ -331,17 +399,21 @@ async function converse(content, isEvent = false, extra = {}, photo = null) {
   } catch (e) {
     if (!controller.signal.aborted) {
       parser.end();
+      activity.failure = 'Spojení se přerušilo. Zkus zprávu odeslat znovu.';
       addLog('event', '· spojení se přerušilo ·');
       console.error(e);
     }
   }
-  face.searching = false; $('search-line').hidden = true;
+  activity.streaming = false; activity.reasoning = false; activity.search = '';
+  if (!controller.signal.aborted && !stripTags(raw) && !activity.failure) activity.failure = 'Nepřišla žádná odpověď. Zkus zprávu odeslat znovu.';
+  face.searching = false;
+  await playbackDone();
   // [přerušeno] model uvidí v historii; v logu i TTS se značky odstraňují
-  // Při přerušení si Verity pamatuje jen to, co stihla opravdu říct; [přerušeno] uvidí model,
+  // Při přerušení si Verity pamatuje dokončené věty; nedokončená věta se vynechá.
+  // [přerušeno] uvidí model,
   // v logu i TTS se značky odstraňují.
   const said = controller.signal.aborted ? [...spokenSoFar, '[přerušeno]'].join(' ') : raw.trim();
   if (raw.trim()) { history.push({ role: 'assistant', content: said, at: Date.now() }); saveHistory(); }
-  await playbackDone();
   if (sources?.length && bubble) {
     const s = document.createElement('span'); s.className = 'src';
     sources.forEach(x => { const a = document.createElement('a'); a.href = x.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = x.title.slice(0, 40); s.appendChild(a); });
@@ -350,139 +422,109 @@ async function converse(content, isEvent = false, extra = {}, photo = null) {
   face.thinking = false;
   if (chatAbort === controller) chatAbort = null;
   busy = false; $('send').disabled = false;
+  activity.outcome = controller.signal.aborted ? 'interrupted' : activity.failure ? 'error' : 'done';
   lastVerityAt = Date.now();
   maybeCompact();
   if (!controller.signal.aborted) resumeConversation();
-  if (added.length && !isEvent) consolidateMemory(content.replace(/\s*\[\[FOTKA\]\]/, ''), added);
+
 }
 
-// ── paměť: fakta + deník ─────────────────────────────────────────────────────
-function rememberFact(text) {
-  const t = text.replace(/\s+/g, ' ').slice(0, 200);
-  if (!t || memory.facts.some(f => f.toLowerCase() === t.toLowerCase())) return;
-  memory.facts.push(t);
-  if (memory.facts.length > 80) memory.facts.shift();
-  saveMemory(); renderMemory();
-}
-
-// Úklid paměti po přidání nového faktu: server se modelu zvlášť zeptá, které starší fakty
-// zpráva nebo nové fakty vyvrací (přestěhování, rozchod, zrušený plán…), a ty se smažou.
-async function consolidateMemory(message, added) {
+// ── adaptivní paměť: pouze doložené lidské údaje ──────────────────────────────
+async function updateMemory(message, at, signal) {
+  activity.memoryTasks++;
   try {
-    const r = await fetch('api/consolidate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, added, facts: memory.facts }) });
+    const r = await fetch('api/memory', {method:'POST',headers:{'Content-Type':'application/json'},
+      signal, body:JSON.stringify({message:message.replace(/\s*\[\[FOTKA\]\]/g,''),at,memory})});
     const d = await r.json();
-    for (const f of d.forget || []) {
-      const i = memory.facts.indexOf(f);
-      if (i >= 0 && !added.includes(f)) { memory.facts.splice(i, 1); addLog('event', `· Verity zapomněla: ${f} ·`); }
-    }
+    if(!r.ok)throw new Error(d.error||'Paměť se neaktualizovala');
+    applyOperations(memory,d.operations);
     saveMemory(); renderMemory();
-  } catch (e) { console.warn('úklid paměti:', e.message); }
+  } catch(e) {
+    if(!signal?.aborted){activity.memoryError=true;console.warn('paměť:',e.message);}
+  } finally { activity.memoryTasks--; }
 }
 
-// [zapomeň: …] – Verity si opraví paměť. Model nemusí fakt citovat doslova: vybere se nejpodobnější
-// (shoda slovních kmenů); když se nic dost nepodobá, nesmaže se nic.
-const stems = s => new Set(s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').match(/[a-z0-9]{3,}/g)?.map(w => w.slice(0, 4)) || []);
-function forgetFact(text) {
-  const want = stems(text);
-  let best = -1, score = 0;
-  memory.facts.forEach((f, i) => {
-    const have = stems(f);
-    const common = [...want].filter(w => have.has(w)).length;
-    const s = common / Math.max(1, Math.min(want.size, have.size));   // podíl shody vůči kratšímu
-    if (s > score) { score = s; best = i; }
-  });
-  if (best < 0 || score < 0.6) return;
-  const [removed] = memory.facts.splice(best, 1);
-  saveMemory(); renderMemory();
-  addLog('event', `· Verity zapomněla: ${removed} ·`);
-}
-
-// Když pracovní okno přeroste WINDOW_MAX, nejstarší úsek se na pozadí shrne do deníku
-// a okno poskočí dopředu. Skoky po větších kusech = začátek promptu se mění zřídka → cache.
+// Shrnutí pouze archivuje ověřené lidské citace; nesmí znovu vyrábět fakta.
 let compacting = false;
 async function maybeCompact() {
-  if (compacting || history.length - memory.windowStart <= WINDOW_MAX) return;
-  compacting = true;
-  const from = memory.windowStart, chunk = history.slice(from, from + WINDOW_CHUNK);
-  try {
-    const r = await fetch('api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chunk.map(({ role, content }) => ({ role, content })),
-        previous: memory.diary.at(-1)?.text || '', facts: memory.facts }) });
-    const d = await r.json();
-    if (!r.ok || !d.summary) throw new Error(d.error || 'bez shrnutí');
-    (d.facts || []).forEach(rememberFact);
-    memory.diary.push({ text: d.summary, at: chunk[0]?.at || Date.now() });
-    if (memory.diary.length > 40) memory.diary.shift();
-    memory.windowStart = from + WINDOW_CHUNK;
-    saveMemory(); renderMemory();
-  } catch (e) {
-    console.warn('deník:', e.message);
-    // nouzově: okno nesmí růst donekonečna
-    if (history.length - memory.windowStart > WINDOW_MAX * 2) { memory.windowStart += WINDOW_CHUNK; saveMemory(); }
-  }
-  compacting = false;
+  if(compacting || history.length-memory.windowStart<=WINDOW_MAX)return;
+  compacting=true;activity.memoryTasks++;
+  const from=memory.windowStart,chunk=history.slice(from,from+WINDOW_CHUNK);
+  try{
+    const r=await fetch('api/summarize',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:chunk.map(({role,content,at})=>({role,content,at}))})});
+    const d=await r.json();
+    if(!r.ok || typeof d.summary!=='string' || d.verified!==true)throw new Error(d.error||'Neověřené shrnutí');
+    if(d.summary.trim())memory.diary.push({text:d.summary.slice(0,2000),at:chunk.at(-1)?.at||Date.now(),verified:true});
+    memory.windowStart=from+WINDOW_CHUNK;
+    saveMemory();renderMemory();
+  }catch(e){
+    activity.memoryError=true;console.warn('deník:',e.message);
+    // Historie zůstává uložená; omezuje se jen kontext modelu.
+  }finally{compacting=false;activity.memoryTasks--;}
 }
-
 function renderMemory() {
-  const facts = $('mem-facts'), diary = $('mem-diary');
-  facts.innerHTML = ''; diary.innerHTML = '';
-  // fakta: ✎ upravit (Enter uloží, Esc zruší), × smazat
-  memory.facts.forEach((f, i) => {
-    const li = document.createElement('li');
-    const span = document.createElement('span'); span.className = 'fact-text'; span.textContent = f;
-    const edit = document.createElement('button'); edit.textContent = '✎'; edit.title = 'Upravit';
-    const x = document.createElement('button'); x.textContent = '×'; x.title = 'Zapomenout';
-    x.onclick = () => { memory.facts.splice(i, 1); saveMemory(); renderMemory(); };
-    edit.onclick = () => editFact(li, span, i);
-    span.ondblclick = () => editFact(li, span, i);
-    li.append(span, edit, x); facts.appendChild(li);
+  pruneMemory(memory);
+  const facts=$('mem-facts'),diary=$('mem-diary');
+  facts.innerHTML='';diary.innerHTML='';
+  memory.entries.forEach(f=>{
+    const li=document.createElement('li'),span=document.createElement('span');
+    span.className='fact-text';span.textContent=f.text;
+    const detail=f.source==='legacy'?'Starší údaj bez doloženého data':
+      'Potvrzeno '+new Date(f.updatedAt).toLocaleDateString('cs-CZ');
+    span.title=detail+(f.expiresAt?' · Platnost do '+new Date(f.expiresAt).toLocaleDateString('cs-CZ'):' · Do změny');
+    const meta=document.createElement('small');meta.textContent=span.title;meta.style.display='block';span.appendChild(meta);
+    const edit=document.createElement('button');edit.textContent='✎';edit.title='Upravit';
+    const x=document.createElement('button');x.textContent='×';x.title='Zapomenout';
+    x.onclick=()=>{removeEntry(memory,f.key);saveMemory();renderMemory();};
+    edit.onclick=()=>editFact(li,span,f.key);span.ondblclick=()=>editFact(li,span,f.key);
+    li.append(span,edit,x);facts.appendChild(li);
   });
-  memory.diary.forEach(d => {
-    const li = document.createElement('li');
-    const when = document.createElement('small'); when.textContent = new Date(d.at).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
-    li.append(when, document.createTextNode(' ' + d.text)); diary.appendChild(li);
+  memory.diary.forEach(d=>{
+    const li=document.createElement('li'),when=document.createElement('small');
+    when.textContent=new Date(d.at).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+
+      (d.verified?'':' · starší neověřený zápis');
+    li.append(when,document.createTextNode(' '+d.text));diary.appendChild(li);
   });
-  $('mem-count').textContent = `${history.length} zpráv celkem · ${history.length - memory.windowStart} v pracovním okně · ${memory.facts.length} faktů · ${memory.diary.length} zápisů v deníku`;
+  $('mem-count').textContent=history.length+' zpráv celkem · '+memory.entries.length+' údajů · '+memory.diary.length+' zápisů. Staré dočasné údaje se automaticky promazávají.';
 }
-
-function editFact(li, span, i) {
-  const input = document.createElement('input');
-  input.className = 'fact-input'; input.value = i < memory.facts.length ? memory.facts[i] : ''; input.maxLength = 200;
-  li.replaceChild(input, span); input.focus(); input.select();
-  let done = false;
-  const save = ok => {
-    if (done) return; done = true;
-    const v = input.value.replace(/\s+/g, ' ').trim();
-    if (ok && v) { if (i < memory.facts.length) memory.facts[i] = v; else memory.facts.push(v); saveMemory(); }
-    else if (ok && !v && i < memory.facts.length) { memory.facts.splice(i, 1); saveMemory(); }
+function editFact(li,span,key=null) {
+  const input=document.createElement('input');
+  input.className='fact-input';input.value=memory.entries.find(e=>e.key===key)?.text||'';input.maxLength=300;
+  li.replaceChild(input,span);input.focus();input.select();
+  let done=false;
+  const save=ok=>{
+    if(done)return;done=true;
+    if(ok){manualEntry(memory,key,input.value);saveMemory();}
     renderMemory();
   };
-  input.onkeydown = e => { if (e.key === 'Enter') save(true); if (e.key === 'Escape') save(false); };
-  input.onblur = () => save(true);
+  input.onkeydown=e=>{if(e.key==='Enter')save(true);if(e.key==='Escape')save(false);};
+  input.onblur=()=>save(true);
 }
-$('mem-add').onclick = () => {
-  const li = document.createElement('li'); const span = document.createElement('span');
-  li.appendChild(span); $('mem-facts').appendChild(li);
-  editFact(li, span, memory.facts.length);
+$('mem-add').onclick=()=>{
+  const li=document.createElement('li'),span=document.createElement('span');
+  li.appendChild(span);$('mem-facts').appendChild(li);editFact(li,span);
 };
-$('opt-memory').onclick = () => { renderMemory(); $('memory-panel').hidden = false; $('menu').hidden = true; };
-$('mem-close').onclick = () => { $('memory-panel').hidden = true; };
-$('mem-export').onclick = () => {
-  const blob = new Blob([JSON.stringify({ version: 1, history, memory, instability, visits }, null, 1)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `verity-pamet-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+$('opt-memory').onclick=()=>{saveMemory();renderMemory();$('memory-panel').hidden=false;$('menu').hidden=true;};
+$('mem-close').onclick=()=>{$('memory-panel').hidden=true;};
+$('mem-export').onclick=()=>{
+  saveMemory();
+  const blob=new Blob([JSON.stringify({version:2,history,memory,instability,visits},null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='verity-pamet-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 };
-$('mem-import').onclick = () => $('mem-file').click();
-$('mem-file').onchange = async e => {
-  try {
-    const d = JSON.parse(await e.target.files[0].text());
-    if (!Array.isArray(d.history) || !d.memory) throw new Error('neplatný soubor');
-    store.set('history', d.history); store.set('memory', d.memory);
-    store.set('inst', d.instability || 0); store.set('visits', d.visits || 0);
-    location.reload();
-  } catch (err) { alert('Paměť nejde načíst: ' + err.message); }
+$('mem-import').onclick=()=>$('mem-file').click();
+$('mem-file').onchange=async e=>{
+  try{
+    const d=JSON.parse(await e.target.files[0].text());
+    if(!Array.isArray(d.history)||!d.memory)throw new Error('neplatný soubor');
+    // Originál importu lze vrátit, i když převod promaže dávno prošlé údaje.
+    if(!store.set('memory-before-import',{at:Date.now(),history,memory,instability,visits}))throw new Error('Není místo pro zálohu');
+    store.set('memory-import-original',d.memory);
+    store.set('history',d.history);store.set('memory',normalizeMemory(d.memory));
+    store.set('inst',d.instability||0);store.set('visits',d.visits||0);location.reload();
+  }catch(err){alert('Paměť nejde načíst: '+err.message);}
 };
 
 function sendText(text, voice = null) {
@@ -490,7 +532,7 @@ function sendText(text, voice = null) {
   const photo = pendingPhoto; clearPhoto();
   $('msg').value = '';
   lastUserAt = Date.now(); idleCount = 0;
-  converse(text || 'Podívej, posílám ti fotku.', false, voice ? { viaVoice: true, ambience: voice.ambience } : {}, photo);
+  converse(text || 'Podívej, posílám ti fotku.', false, voice ? { viaVoice: true, liveVoice: voice.live === true, ambience: voice.ambience } : {}, photo);
   return true;
 }
 
@@ -510,6 +552,7 @@ setupPhoto({
 });
 $('form').addEventListener('submit', e => {
   e.preventDefault();
+  if (liveSession || liveStarting) { stopLive({ send: true }); return; }
   if (mic) { finishMic(true); return; }     // Odeslat během nahrávání: dokončit přepis a pak poslat
   if (micFinishing) return;
   sendText($('msg').value.trim());
@@ -521,27 +564,49 @@ $('form').addEventListener('submit', e => {
 // takže se do další zprávy nenahraje hlas Verity.
 // Konverzační režim: odesílá po pauze A po dohrání celé odpovědi Verity sám znovu zapne
 // mikrofon (až když dozní její hlas – nenahraje ho). Když 15 s nikdo nemluví, mikrofon zavře.
-let mic = null, micFinishing = false, micBase = '', micTimer = null, convWatch = null;
-let autoSend = store.get('autoSend', false);
+let mic = null, micStarting = false, micGeneration = 0, micFinishing = false, micBase = '', micTimer = null, convWatch = null;
+let autoSend = store.get('autoSend', true);
 let convMode = store.get('conv', false);
+let sileroVad = store.get('silero', true);
+const savedThreshold = store.get('micThresholdDb', -50);
+let micThreshold = Number.isFinite(savedThreshold) ? clamp(savedThreshold, -70, -10) : -50;
+const savedOutput = store.get('outputMode', 'aec');
+let outputMode = ['speakers', 'aec', 'headphones'].includes(savedOutput) ? savedOutput : 'aec';
+let liveMode = store.get('live', true), liveSession = null, liveStarting = false, liveGeneration = 0;
+let livePending = [], liveDrain = null, liveBase = '';
 const sendsAuto = () => autoSend || convMode;
 const micSupported = !!(navigator.mediaDevices?.getUserMedia && window.AudioWorkletNode && window.isSecureContext);
 function micState(text, error = false) {
+  activity.inputError = error ? text : '';
   const el = $('mic-state');
   el.textContent = text || ''; el.hidden = !text; el.classList.toggle('err', error);
 }
 // Ukazatel detekce řeči: úroveň mikrofonu (−70…−10 dBFS), čárka = práh začátku řeči,
 // šedá oblast = šum pozadí; zelená = VAD právě detekuje řeč (ta se posílá k přepisu).
+// Ruční práh platí i se Silero: hlas musí překročit práh a zároveň ho musí poznat síť.
 const dbToPct = db => Math.max(0, Math.min(100, (db + 70) / 60 * 100));
 function vadMeter(v) {
   $('vad-fill').style.width = dbToPct(v.db) + '%';
   $('vad-noise').style.width = dbToPct(v.noiseDb) + '%';
   $('vad-thr').style.left = dbToPct(v.onDb) + '%';
-  $('vad').classList.toggle('speaking', v.speaking);
-  $('vad-label').textContent = v.speaking ? 'MLUVÍŠ' : 'ticho';
+  $('vad-thr').style.display = '';
+  $('vad').classList.toggle('suppressed', !!v.suppressed);
+  $('vad').classList.toggle('speaking', v.speaking && v.voiced && !v.suppressed);
+  $('vad-label').textContent = v.suppressed ? 'ozvěna blokována' : (v.speaking && v.voiced ? 'MLUVÍŠ' : 'pod prahem / ticho') + (v.neural ? ` · ${Math.round(v.prob * 100)} %` : '');
 }
+function thresholdUi() {
+  $('mic-threshold').value = micThreshold;
+  $('mic-threshold').setAttribute('aria-valuetext', micThreshold + ' decibelů; doprava méně citlivý');
+  $('vad-threshold-value').textContent = micThreshold + ' dB';
+  $('vad-thr').style.left = dbToPct(micThreshold) + '%';
+}
+thresholdUi();
+$('mic-threshold').oninput = e => {
+  micThreshold = clamp(Number(e.target.value), -70, -10);
+  store.set('micThresholdDb', micThreshold); thresholdUi();
+};
 function micUi(on) {
-  $('vad').hidden = !on;
+  $('vad').classList.toggle('active', on);
   $('mic').classList.toggle('rec', on);
   $('mic').setAttribute('aria-pressed', on);
   $('msg').readOnly = on;           // během nahrávání by přepis přepsal ruční úpravy
@@ -550,31 +615,45 @@ function micUi(on) {
 }
 const listeningText = () => (convMode ? 'Konverzace – poslouchám, odešlu po pauze' : autoSend ? 'Poslouchám… odešlu po pauze' : 'Poslouchám… (Odeslat nebo znovu mikrofon)');
 async function startMic({ fromConv = false } = {}) {
-  if (mic || micFinishing || !awake) return;
+  if (mic || micStarting || micFinishing || liveSession || liveStarting || !awake) return;
+  micStarting = true; activity.outcome = 'idle'; activity.failure = ''; activity.inputError = '';
+  const generation = ++micGeneration;
+  micBase = $('msg').value.trim();
   if (!fromConv && (busy || playing)) interrupt();   // skočit Verity do řeči
+  if (music.gain) music.gain.gain.value = 0;
   micState('Zapínám mikrofon…');
   try {
-    const { startMicrophone } = await import('./live-audio.js');
-    mic = await startMicrophone({
-      pauseSeconds: 2.2,
+    await initAudio();
+    if (generation !== micGeneration) return;
+    await prepareEchoOutput();
+    if (generation !== micGeneration) return;
+    const { startMicrophone } = await import('./live-audio.js?v=20261107-6');
+    const opened = await startMicrophone({
+      pauseSeconds: 2.2, vad: sileroVad, debug: false, audioContext: actx,
+      getThreshold: () => micThreshold, suppressInput: inputSuppressed, echoCancellation: outputMode === 'aec',
       onText: (t, { partial }) => {
+        if (generation !== micGeneration) return;
         $('msg').value = [micBase, t].filter(Boolean).join(' ');
         if (mic) micState(partial ? 'Poslouchám… (přepis se upřesňuje)' : 'Poslouchám…');
       },
-      onState: (m, err) => micState(m, err),
+      onState: (m, err) => { if (generation === micGeneration) micState(m, err); },
       onLevel: v => {
+        if (generation !== micGeneration) return;
         face.hear += ((v.speaking ? v.level : v.level * 0.3) - face.hear) * 0.4;
         if (v.speaking) lastUserAt = Date.now();
         vadMeter(v);
       },
-      onPause: () => { if (sendsAuto()) finishMic(true); },
+      onPause: () => { if (generation === micGeneration && sendsAuto()) finishMic(true); },
     });
+    if (generation !== micGeneration) { await opened.cancel(); return; }
+    mic = opened;
+    confirmEchoMode(opened.engine);
   } catch (e) {
-    mic = null;
-    micState(e.name === 'NotAllowedError' ? 'Mikrofon není povolený – povol ho v prohlížeči.' : 'Mikrofon nejde zapnout: ' + e.message, true);
+    if (generation !== micGeneration) return;
+    mic = null; releaseEchoOutput();
+    micState(microphoneError(e), true);
     return;
-  }
-  micBase = $('msg').value.trim();
+  } finally { if (generation === micGeneration) micStarting = false; }
   micUi(true);
   micState(listeningText());
   micTimer = setTimeout(() => finishMic(sendsAuto()), 90000);   // nejdéle 90 s
@@ -588,7 +667,9 @@ async function startMic({ fromConv = false } = {}) {
   }
 }
 async function cancelMic(message = '') {
-  if (!mic) return;
+  micGeneration++; micStarting = false;
+  if (!liveSession) releaseEchoOutput();
+  if (!mic) { micUi(false); micState(message); return; }
   const m = mic; mic = null;
   clearTimeout(micTimer); clearInterval(convWatch);
   micUi(false);
@@ -597,8 +678,8 @@ async function cancelMic(message = '') {
 }
 // po dohrání odpovědi v konverzačním režimu rovnou poslouchat
 function resumeConversation() {
-  if (!convMode || !micSupported || !awake || document.hidden) return;
-  setTimeout(() => { if (!busy && !playing && !mic && !micFinishing) startMic({ fromConv: true }); }, 400);
+  if (liveMode || !convMode || !micSupported || !awake || document.hidden) return;
+  setTimeout(() => { if (!liveMode && !busy && !playing && !mic && !micFinishing) startMic({ fromConv: true }); }, 400);
 }
 async function finishMic(send) {
   if (!mic) return;
@@ -608,18 +689,22 @@ async function finishMic(send) {
   micState('Dokončuji přepis…');
   let text = '', failed = false;
   try { text = await m.stop(); } catch (e) { failed = true; micState(e.message + ' Text můžeš opravit a poslat ručně.', true); }
-  const full = [micBase, text].filter(Boolean).join(' ').trim();
+  const full = failed ? $('msg').value.trim() : [micBase, text].filter(Boolean).join(' ').trim();
   $('msg').value = full;
-  micFinishing = false;
-  if (!failed) micState('');
+  micFinishing = false; releaseEchoOutput();
+  if (!failed) micState(m.engine.archiveWarning || '', !!m.engine.archiveWarning);
   // automatické odeslání jen po úspěšném finálním přepisu
   if (send && !failed && full) {
     if (busy) await new Promise(r => { const t = setInterval(() => { if (!busy) { clearInterval(t); r(); } }, 100); });
     sendText(full, { ambience: m.engine.ambience() });
-  } else if (!failed) $('msg').focus();
+  } else if (full || failed) openChat(true);
 }
 $('mic').hidden = !micSupported;
-$('mic').onclick = () => (mic ? finishMic(false) : startMic());
+$('mic').onclick = () => {
+  if (micFinishing) return;
+  if (liveMode) return liveSession || liveStarting ? stopLive() : startLive();
+  return micStarting ? cancelMic() : mic ? finishMic(false) : startMic();
+};
 $('opt-auto').checked = autoSend;
 $('opt-auto').onchange = e => {
   autoSend = e.target.checked; store.set('autoSend', autoSend);
@@ -631,6 +716,161 @@ $('opt-conv').onchange = e => {
   if (mic) micState(listeningText());
   else if (convMode && !busy && !playing) startMic();   // zapnutím rovnou začít poslouchat
 };
+$('opt-silero').checked = sileroVad;
+// Silero načíst dopředu ve workeru, ať se 15 MB WASM nekompiluje až v okamžiku nahrávání.
+const preloadSilero = () => { if (sileroVad && micSupported) import('./vad.js?v=20261107-2').then(m => m.preload()).catch(() => {}); };
+if (window.requestIdleCallback) window.requestIdleCallback(preloadSilero, { timeout: 1500 });
+else setTimeout(preloadSilero, 1500);
+$('opt-silero').onchange = e => { sileroVad = e.target.checked; store.set('silero', sileroVad); preloadSilero(); };   // platí od dalšího zapnutí mikrofonu
+
+
+// ── experimentální živý rozhovor: jeden vstup, nezávislé tahy ────────────────
+function liveUi(on) {
+  $('live-panel').hidden = !on;
+  $('mic').setAttribute('aria-label', on ? 'Ukončit živý rozhovor' : 'Mluvit');
+  $('mic').title = on ? 'Ukončit živý rozhovor' : 'Mluvit';
+  micUi(on);
+}
+async function deliverLive(turn, generation) {
+  if (generation !== liveGeneration) return;
+  livePending.push(turn);
+  if (liveDrain) return;
+  const marker = {}; liveDrain = marker;
+  try {
+    if (busy || playing) interrupt();
+    const deadline = Date.now() + 10000;
+    while (busy && generation === liveGeneration && Date.now() < deadline) await sleep(50);
+    if (generation !== liveGeneration) return;
+    if (busy) { await stopLive({ message: 'Odpověď se nepodařilo přerušit. Text zůstal rozepsaný.', error: true }); return; }
+    const turns = livePending.splice(0);
+    const text = turns.map(t => t.text).join(' ').trim();
+    // Nová řeč už může být rozepsaná, zatímco čekáme na uvolnění staré odpovědi.
+    const draft = $('msg').value;
+    if (text) sendText(text, { live: true, ambience: turns.at(-1)?.ambience });
+    $('msg').value = draft;
+  } finally { if (liveDrain === marker) liveDrain = null; }
+}
+async function startLive() {
+  if (liveSession || liveStarting || micFinishing || !awake || !micSupported) return;
+  liveStarting = true; activity.outcome = 'idle'; activity.failure = ''; activity.inputError = '';
+  const generation = ++liveGeneration;
+  await cancelMic();
+  if (generation !== liveGeneration) return;
+  liveBase = $('msg').value.trim();
+  if (busy || playing) interrupt();
+  if (music.gain) music.gain.gain.value = 0;
+  liveUi(true); outputModeUi(); micState('Živý rozhovor se zapíná…');
+  try {
+    await initAudio();
+    if (generation !== liveGeneration) return;
+    await prepareEchoOutput();
+    if (generation !== liveGeneration) return;
+    const { startDialogue } = await import('./dialogue.js?v=20261107-6');
+    const opened = await startDialogue({
+      audioContext: actx, vad: sileroVad,
+      getThreshold: () => micThreshold, suppressInput: inputSuppressed, echoCancellation: outputMode === 'aec',
+      isAnswering: () => busy || playing,
+      onText: text => {
+        if (generation !== liveGeneration) return;
+        $('msg').value = [liveBase, text].filter(Boolean).join(' ');
+        micState('Živě · přepis se upřesňuje');
+      },
+      onState: (text, error) => {
+        if (generation !== liveGeneration) return;
+        micState(text, error);
+        if (error) stopLive({ message: text + ' Text můžeš upravit a poslat ručně.', error: true });
+      },
+      onLevel: v => {
+        if (generation !== liveGeneration) return;
+        vadMeter(v);
+        face.hear += ((v.speaking ? v.level : 0) - face.hear) * 0.4;
+        if (v.speaking) lastUserAt = Date.now();
+        $('live-takeover').disabled = !busy && !playing && !current;
+        $('live-status').textContent = v.suppressed ? (current ? 'Mluvím · vstup je blokovaný' : 'Čekám na dozvuk…') : v.speaking && v.voiced ? 'Slyším tě' : current ? 'Mluvím · můžeš mě přerušit' : busy ? 'Připravuji odpověď · poslouchám dál' : 'Poslouchám';
+      },
+      onInterrupt: () => { if (generation === liveGeneration) { interrupt(); micState('Živě · máš slovo'); } },
+      onTurn: turn => {
+        if (generation !== liveGeneration) return;
+        turn.text = [liveBase, turn.text].filter(Boolean).join(' '); liveBase = '';
+        $('msg').value = '';
+        micState('Živě · zpráva odeslaná, poslouchám dál');
+        deliverLive(turn, generation);
+      },
+      onIdle: message => { if (generation === liveGeneration) stopLive({ message: message || 'Živý rozhovor se po dvou minutách ticha ukončil.' }); },
+    });
+    if (generation !== liveGeneration) { await opened.cancel(); return; }
+    liveSession = opened;
+    outputModeUi();
+    const fallback = confirmEchoMode(opened.engine);
+    micState(fallback ? 'Potlačení ozvěny není dostupné. Bezpečně střídáme mluvení a poslech.' : 'Živě · odesílám po pauze. Citlivost najdeš v nastavení.');
+  } catch (e) {
+    if (generation !== liveGeneration) return;
+    liveUi(false); releaseEchoOutput();
+    micState(microphoneError(e), true);
+  } finally { if (generation === liveGeneration) liveStarting = false; }
+}
+async function stopLive({ send = false, message = 'Živý rozhovor skončil. Rozepsaný text můžeš poslat ručně.', error = false } = {}) {
+  const session = liveSession;
+  if (session || liveStarting) interrupt();
+  const generation = ++liveGeneration;
+  liveSession = null; liveStarting = false;
+  releaseEchoOutput();
+  const pending = livePending.splice(0).map(t => t.text).join(' ');
+  liveDrain = null;
+  const draft = [pending, $('msg').value.trim()].filter(Boolean).join(' ');
+  const base = liveBase; liveBase = '';
+  $('msg').value = draft;
+  liveUi(false); micState(message, error);
+  if (!session) return;
+  micFinishing = true;
+  try {
+    // Běžné ukončení zachová už zobrazený přepis a ihned uvolní zařízení.
+    const text = send ? await session.stop() : (await session.cancel(), '');
+    if (generation !== liveGeneration) return;
+    $('msg').value = send && text ? [pending, base, text].filter(Boolean).join(' ') : draft;
+    if (send && $('msg').value.trim()) {
+      interrupt();
+      const deadline = Date.now() + 10000;
+      while (busy && Date.now() < deadline) await sleep(50);
+      if (generation === liveGeneration) sendText($('msg').value.trim(), { live: true, ambience: session.engine.ambience() });
+    }
+  } catch (e) { if (generation === liveGeneration) { $('msg').value = draft; micState(e.message + ' Text zůstal rozepsaný.', true); } }
+  finally { micFinishing = false; }
+}
+function liveOptions() {
+  $('opt-auto').disabled = $('opt-conv').disabled = liveMode;
+  $('opt-live').checked = liveMode;
+}
+$('opt-live').closest('label').hidden = !micSupported;
+liveOptions();
+$('opt-live').onchange = async e => {
+  liveMode = e.target.checked; store.set('live', liveMode); liveOptions();
+  await cancelMic();
+  if (liveMode) { if (awake) startLive(); }
+  else await stopLive({ message: 'Zpátky v běžném režimu mluvení.' });
+};
+$('live-end').onclick = () => stopLive();
+$('live-takeover').onclick = () => {
+  interrupt();
+  speakerTailUntil = performance.now() + 900;
+  micState('Máš slovo za okamžik, až dozní reproduktor.');
+};
+function outputModeUi() {
+  $('opt-output').value = outputMode;
+  const note = outputMode === 'speakers' ? 'Reproduktory: při odpovědi vstup stojí. Přeruš tlačítkem Chci mluvit.' : outputMode === 'aec' ? 'AEC: můžeš přerušit hlasem. Při ozvěně nebo praskání přepni na střídání.' : 'Sluchátka: poslech i přerušení hlasem bez zvukových filtrů.';
+  $('output-note').textContent = note;
+  $('live-hint').textContent = note;
+  renderVoiceControls();
+}
+outputModeUi();
+$('opt-output').onchange = async e => {
+  outputMode = e.target.value; store.set('outputMode', outputMode); outputModeUi();
+  if (mic || micStarting || liveSession || liveStarting) {
+    await cancelMic();
+    await stopLive({ message: 'Zvukový režim změněn. Mikrofonem zahaj nový poslech.' });
+  }
+};
+window.addEventListener('pagehide', () => { if (liveSession || liveStarting) stopLive(); });
 
 // ── vnímání: kurzor, psaní, nečinnost, odchod ze záložky ─────────────────────
 let typingUntil = 0;
@@ -643,7 +883,7 @@ document.addEventListener('pointerleave', () => face.lookAt(0, 0));
 $('msg').addEventListener('input', () => { typingUntil = performance.now() + 1500; face.lookAt(0, 1); lastUserAt = Date.now(); });
 
 setInterval(() => {
-  if (!awake || busy || playing || mic || micFinishing || document.hidden || idleCount >= 3) return;
+  if (!awake || busy || playing || mic || micFinishing || liveSession || liveStarting || document.hidden || idleCount >= 3) return;
   const quiet = (Date.now() - Math.max(lastUserAt, lastVerityAt)) / 1000;
   const limit = Math.max(35, 95 - instability * 0.6);
   if (quiet > limit) {
@@ -675,6 +915,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) lock
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    if (liveSession || liveStarting) stopLive({ message: 'Živý rozhovor je pozastavený. Spusť ho znovu mikrofonem.' });
     hiddenAt = Date.now(); tabLeaves++;
     document.title = 'Verity · kde jsi?';
     if (instability > 50) titleTimer = setInterval(() => { document.title = document.title.startsWith('VRAŤ') ? 'Verity · kde jsi?' : 'VRAŤ SE'; }, 1500);
@@ -733,13 +974,49 @@ pollStatus();
 setInterval(pollStatus, 10000);
 
 // ── menu ─────────────────────────────────────────────────────────────────────
-$('menu-btn').onclick = () => { $('menu').hidden = !$('menu').hidden; };
+function setMenu(open) {
+  $('menu').hidden = !open;
+  $('menu-btn').setAttribute('aria-expanded', String(open));
+  if (open) { closeChat(false); $('menu-close').focus(); }
+  else $('menu-btn').focus();
+}
+function closeChat(focus = true) {
+  $('chat-panel').hidden = true;
+  $('show-chat').setAttribute('aria-expanded','false');
+  document.body.classList.remove('chat-open');
+  if (focus) $('show-chat').focus();
+}
+function openChat(focusInput = false) {
+  $('menu').hidden = true; $('menu-btn').setAttribute('aria-expanded','false');
+  $('chat-panel').hidden = false;
+  $('show-chat').setAttribute('aria-expanded','true');
+  document.body.classList.add('chat-open');
+  scrollLog();
+  if (focusInput) $('msg').focus(); else $('chat-close').focus();
+}
+$('menu-btn').onclick = () => setMenu($('menu').hidden);
+$('menu-close').onclick = () => setMenu(false);
+$('show-chat').onclick = () => $('chat-panel').hidden ? openChat() : closeChat();
+$('chat-close').onclick = () => closeChat();
+$('write-message').onclick = async () => {
+  await cancelMic();
+  if (liveSession || liveStarting) await stopLive({message:''});
+  openChat(true);
+};
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('memory-panel').hidden) { $('mem-close').click(); return; }
+  if (!$('menu').hidden) setMenu(false);
+  else if (!$('chat-panel').hidden) closeChat();
+});
 // podkres: ♪ v liště + hlasitost / opakování v menu
 $('music-btn').onclick = () => toggleMusic();
 $('music-play').onclick = () => toggleMusic();
 $('music-vol').value = musicVol;
 $('music-vol').oninput = e => { musicVol = +e.target.value; store.set('musicVol', musicVol); };
 // přemýšlení (reasoning): auto / off / on
+$('opt-roleplay').checked = !roleplayPaused;
+$('opt-roleplay').onchange = e => { roleplayPaused = !e.target.checked; store.set('roleplayPaused',roleplayPaused); };
 $('opt-think').value = thinkMode;
 $('opt-think').onchange = e => { thinkMode = e.target.value; store.set('think', thinkMode); };
 $('music-dance').checked = danceOn;
@@ -753,7 +1030,7 @@ $('meter').hidden = !$('opt-meter').checked;
 $('opt-meter').onchange = e => { $('meter').hidden = !e.target.checked; store.set('meter', e.target.checked); };
 $('opt-reset').onclick = () => {
   if (!confirm('Opravdu chceš, aby na tebe Verity zapomněla?')) return;
-  ['history', 'memory', 'inst', 'visits', 'lastSeen'].forEach(k => { try { localStorage.removeItem('verity.' + k); } catch { /* */ } });
+  ['history', 'memory', 'memory-backup-v1', 'memory-before-import', 'memory-import-original', 'inst', 'visits', 'lastSeen'].forEach(k => { try { localStorage.removeItem('verity.' + k); } catch { /* */ } });
   location.reload();
 };
 
@@ -761,24 +1038,36 @@ $('opt-reset').onclick = () => {
 history.filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-300)
   .forEach(m => addLog(m.role === 'user' ? 'user' : 'verity', m.role === 'user' ? m.content : stripTags(m.content), m.thumb));
 
-$('wake-btn').onclick = async () => {
+async function wake({ voice = true } = {}) {
+  if (awake) return;
   await initAudio();
   if (store.get('music', false)) toggleMusic(true);   // podkres hrál i minule → pokračovat
+  awake = true;
   lockScreen();                                        // nezhasínat displej, dokud je Verity vidět
   awake = true;
   visits++; store.set('visits', visits);
   $('wake').classList.add('gone');
-  $('msg').focus();
+  $('wake').hidden = true;
+  if (!voice) openChat(true);
   lastUserAt = lastVerityAt = Date.now();
-  await pollStatus();
+  const statusReady = pollStatus();
+  if (voice && micSupported) {
+    if (liveMode) await startLive(); else await startMic();
+  } else if (voice) openChat(true);
+  await statusReady;
   const hours = lastSeen ? Math.round((Date.now() - lastSeen) / 36e5) : null;
+  if (lastSeen && Date.now() - lastSeen > 3600000) { memory.sessionStart=history.length; saveMemory(); }
+  // Při odmítnutí mikrofonu nebo během vlastní řeči nevynucuj pozdrav.
+  if (voice && (!liveSession && !mic || $('msg').value.trim() || busy || playing)) return;
   if (!history.length) {
     converse('[[UDÁLOST]] Člověk tě právě poprvé probudil. Ještě jste se nikdy neviděli. Krátce se představ a zeptej se, jak se jmenuje.', true);
   } else {
     if (hours > 12) setInstability(instability + Math.min(15, hours / 4));
-    converse(`[[UDÁLOST]] Člověk se vrátil a znovu tě probudil, po ${hours ?? '?'} hodinách. Přivítej ho jménem, pokud ho znáš, a zmiň něco konkrétního ze své paměti (třeba se zeptej, jak dopadlo něco, co plánoval).`, true);
+    converse(`[[UDÁLOST]] Člověk se vrátil a znovu tě probudil, po ${hours ?? '?'} hodinách. Krátce ho přivítej jménem, pokud ho znáš. Neobnovuj staré úkoly, hledání ani plány a nevynucuj zmínku o paměti; počkej, s čím přijde.`, true);
   }
-};
+}
+$('wake-btn').onclick = () => wake().catch(e => { micState('Zvuk nejde spustit: '+e.message,true); });
+$('wake-write').onclick = () => wake({voice:false}).catch(e => { micState(e.message,true); });
 
 // ── mobil: layout podle viditelné oblasti nad klávesnicí ─────────────────────
 const vv = window.visualViewport;
@@ -796,3 +1085,45 @@ window.addEventListener('resize', fitViewport);
 $('msg').addEventListener('focus', () => setTimeout(fitViewport, 300));
 $('msg').addEventListener('blur', () => setTimeout(fitViewport, 300));
 fitViewport();
+
+
+// Samostatný viditelný ukazatel. DOM měníme jen při změně stavu (i pro čtečky obrazovky).
+let lastActivityView = '';
+function renderVoiceControls() {
+  const active = !!(mic || liveSession), starting = micStarting || liveStarting;
+  const label = microphoneLabel({liveMode,active,starting,finishing:micFinishing,supported:micSupported});
+  $('mic-caption').textContent = label;
+  $('mic').setAttribute('aria-label',label); $('mic').title = label;
+  $('mic').classList.toggle('starting',starting);
+  $('mic').disabled = micFinishing;
+  $('call-note').textContent = !micSupported ? 'Můžeš mi napsat zprávu.' : starting ? 'Připojuji mikrofon…' : active ? (liveMode ? 'Odesílám po pauze · poslouchám dál' : sendsAuto() ? 'Odesílám po pauze' : 'Po nahrání můžeš zprávu upravit') : 'Mikrofon je vypnutý';
+  const draft = active || starting ? $('msg').value.trim() : '';
+  if ($('voice-draft').textContent !== draft) $('voice-draft').textContent = draft;
+  $('voice-draft').hidden = !draft;
+  const answering = !!(busy || playing || current);
+  $('live-takeover').hidden = !awake || !answering;
+  $('live-takeover').disabled = !answering;
+}
+function renderActivity() {
+  renderVoiceControls();
+  const engine = liveSession?.engine || mic?.engine;
+  const state = describeActivity({ ...activity, awake, busy, playing,
+    speaking: !!current, voiceWaiting: ttsControllers.size > 0,
+    inputStarting: micStarting || liveStarting,
+    transcribing: micFinishing || !!(engine && !engine.inputSuppressed &&
+      (engine.pending || engine.segments.some(s => !s.done))),
+    hearing: !!engine?.speaking, suppressed: !!engine?.inputSuppressed,
+    listening: !!(mic || liveSession),
+  });
+  const signature = JSON.stringify(state);
+  if (signature === lastActivityView) return;
+  lastActivityView = signature;
+  const el = $('activity');
+  el.hidden = !awake;
+  el.dataset.state = state.key; el.dataset.tone = state.tone;
+  $('activity-title').textContent = state.title;
+  $('activity-detail').textContent = state.detail;
+  $('activity-symbol').textContent = state.tone === 'done' ? '✓' : state.tone === 'error' ? '!' : state.key === 'interrupted' ? 'Ⅱ' : '•';
+}
+setInterval(renderActivity, 150);
+renderActivity();

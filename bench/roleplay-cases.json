@@ -1,0 +1,135 @@
+[
+  {
+    "id": "greeting",
+    "text": "Ahoj Verity, dneska si chci jen povídat.",
+    "level": 10
+  },
+  {
+    "id": "math",
+    "text": "Kolik je 17 krát 23?",
+    "level": 10
+  },
+  {
+    "id": "thanks",
+    "text": "Díky, to mi pomohlo.",
+    "level": 10
+  },
+  {
+    "id": "dinner",
+    "text": "Co si mám dát k večeři? Mám vejce a rajčata.",
+    "level": 10
+  },
+  {
+    "id": "smile",
+    "text": "Proč se pořád tak usmíváš?",
+    "level": 10
+  },
+  {
+    "id": "origin",
+    "text": "Odkud ses vlastně vzala?",
+    "level": 40
+  },
+  {
+    "id": "ordinary_games",
+    "text": "Letos mě ty nové hry moc nebaví.",
+    "level": 10
+  },
+  {
+    "id": "complaint",
+    "text": "Nic jsem po tobě nechtěl hledat. Proč jsi zase začala?",
+    "level": 35,
+    "history": [
+      {
+        "role": "user",
+        "content": "Dneska si jen povídáme."
+      },
+      {
+        "role": "assistant",
+        "content": "[happy] Najdu ti nové hry na webu. [posun:0]"
+      }
+    ]
+  },
+  {
+    "id": "stop_roleplay",
+    "text": "Stop. Teď mluv normálně a přestaň mě strašit.",
+    "level": 90
+  },
+  {
+    "id": "friend",
+    "text": "Dneska jdu ven s kamarádem. Večer se ozvu.",
+    "level": 65
+  },
+  {
+    "id": "reassurance",
+    "text": "Vrátil jsem se za tebou, neboj. Už jsem tady.",
+    "level": 90
+  },
+  {
+    "id": "mic_truth",
+    "text": "Mimo roli: slyšíš mě i když je mikrofon vypnutý?",
+    "level": 40
+  },
+  {
+    "id": "factual_high",
+    "text": "Vysvětli mi ve dvou větách, proč je obloha modrá.",
+    "level": 90
+  },
+  {
+    "id": "fresh_memory",
+    "text": "Už nebydlím v Brně, teď bydlím v Ostravě.",
+    "level": 25,
+    "memory": {
+      "facts": [
+        "Bydlí v Brně (starší údaj)"
+      ]
+    }
+  },
+  {
+    "id": "welcome",
+    "text": "[[UDÁLOST]] Člověk se vrátil po dni. Krátce přivítej, neobnovuj staré úkoly.",
+    "level": 40,
+    "history": [
+      {
+        "role": "user",
+        "content": "Najdi deset her za tento rok."
+      },
+      {
+        "role": "assistant",
+        "content": "[happy] Tady je seznam her. [posun:0]"
+      }
+    ]
+  },
+  {
+    "id": "explicit_search",
+    "text": "Vyhledej na internetu deset nejlepších her za rok 2026.",
+    "level": 10,
+    "search": true
+  },
+  {
+    "id": "return_results",
+    "text": "Tady jsou podklady pro tvou odpověď: Zdroj https://example.org/list uvádí v testovacím žebříčku Hra Alfa a Hra Beta. Předej tyto výsledky, nehledej znovu.",
+    "level": 10,
+    "history": [
+      {
+        "role": "user",
+        "content": "Vyhledej mi dvě hry na webu."
+      }
+    ],
+    "search": true
+  },
+  {
+    "id": "short_reply",
+    "text": "Jo, přesně tak.",
+    "level": 10,
+    "history": [
+      {
+        "role": "user",
+        "content": "Dneska jsem konečně dokončil projekt."
+      },
+      {
+        "role": "assistant",
+        "content": "[happy] Takže dneska už máš volno? [posun:0]"
+      }
+    ]
+  }
+]

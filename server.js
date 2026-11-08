@@ -5,16 +5,23 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
-const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT, detectCrisis, detectSearch, detectCalc } = require('./prompt');
+const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT, detectCrisis, detectCalc } = require('./prompt');
 
-const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, fs.existsSync(path.join(__dirname, 'config.json')) ? 'config.json' : 'config.example.json'), 'utf8'));
+const { searchRequest, detectSearch, needsConversation, QUERY_PROMPT, requestedCount, outputBudget, RESEARCH_PROMPT, cleanResearch, researchProblem } = require('./research');
+const { randomUUID } = require('crypto');
+const { MEMORY_PROMPT } = require('./memory-prompts');
+const memoryCore = import('./public/memory-core.mjs');
+const conversationMode = import('./public/conversation-mode.mjs');
+
+const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 // Klíč k interní Whisper službě je v samostatném souboru (chmod 600), ne v config.json.
 if (CFG.stt?.key_file) {
-  try { CFG.stt.key = fs.readFileSync(path.resolve(__dirname, CFG.stt.key_file), 'utf8').trim(); } catch { console.warn('[stt] chybí soubor s klíčem', CFG.stt.key_file); }
+  try { CFG.stt.key = fs.readFileSync(CFG.stt.key_file, 'utf8').trim(); } catch { console.warn('[stt] chybí soubor s klíčem', CFG.stt.key_file); }
 }
 const PUBLIC = path.join(__dirname, 'public');
 const SEARCH_PY = CFG.search?.python || 'python3';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8', '.wasm': 'application/wasm', '.onnx': 'application/octet-stream',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.ico': 'image/x-icon', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.json': 'application/json', '.md': 'text/plain; charset=utf-8' };
 
@@ -60,21 +67,22 @@ function describeDevice(ua = '') {
 // Přemýšlení (CFG.llm.thinking): llama.cpp ho posílá zvlášť jako reasoning_content – do řeči
 // se nikdy nedostane, jen se hlásí přes onThinking (UI ukáže „přemýšlí…“). Když model
 // vyčerpá limit jen přemýšlením a nic neřekne, zkusí se to znovu bez přemýšlení.
-async function streamLLM(messages, onText, controller, onThinking = () => {}, think = !!CFG.llm.thinking) {
+async function streamLLM(messages, onText, controller, onThinking = () => {}, think = !!CFG.llm.thinking, options = {}) {
   const r = await fetch(CFG.llm.url + '/v1/chat/completions', {
-    method: 'POST', signal: controller.signal,
+    method: 'POST', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(90000)]),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       messages, stream: true,
       temperature: CFG.llm.temperature, top_p: CFG.llm.top_p,
       presence_penalty: CFG.llm.presence_penalty,
-      max_tokens: CFG.llm.max_tokens + (think ? (CFG.llm.thinking_budget || 1500) : 0),
+      max_tokens: (options.maxTokens || CFG.llm.max_tokens) + (think ? (CFG.llm.thinking_budget || 1500) : 0),
       chat_template_kwargs: { enable_thinking: think },
+      ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
     }),
   });
   if (!r.ok) throw new Error('LLM HTTP ' + r.status);
   const decoder = new TextDecoder();
-  let buf = '', said = 0, thought = 0;
+  let buf = '', said = 0, thought = 0, finishReason = null;
   try {
     for await (const chunk of r.body) {
       buf += decoder.decode(chunk, { stream: true });
@@ -84,11 +92,12 @@ async function streamLLM(messages, onText, controller, onThinking = () => {}, th
         if (!line.startsWith('data:')) continue;
         const data = line.slice(5).trim();
         if (data === '[DONE]') break;
-        try {
-          const delta = JSON.parse(data).choices?.[0]?.delta || {};
-          if (delta.reasoning_content) { if (!thought++) onThinking(true); }
-          if (delta.content) { if (!said++ && thought) onThinking(false); onText(delta.content); }
-        } catch { /* neúplný řádek */ }
+        let choice;
+        try { choice = JSON.parse(data).choices?.[0]; } catch { continue; }
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+        const delta = choice?.delta || {};
+        if (delta.reasoning_content) { if (!thought++) onThinking(true); }
+        if (delta.content) { if (!said++ && thought) onThinking(false); onText(delta.content); }
       }
     }
   } catch (e) {
@@ -97,36 +106,38 @@ async function streamLLM(messages, onText, controller, onThinking = () => {}, th
   if (think && !said && thought && !controller.signal.aborted) {
     console.warn('[llm] přemýšlení bez odpovědi → znovu bez přemýšlení');
     onThinking(false);
-    return streamLLM(messages, onText, controller, onThinking, false);
+    return streamLLM(messages, onText, controller, onThinking, false, options);
   }
+  return { finishReason };
 }
 
 // Filtr, který propouští text, ale zachytí značku [hledat: ...] a přeruší generování.
 function makeTagFilter(emit, onSearch) {
-  let pending = '';
+  let pending = '', stopped = false;
   return {
     feed(chunk) {
+      if (stopped) return;
       pending += chunk;
       for (;;) {
         const i = pending.indexOf('[');
         if (i < 0) { emit(pending); pending = ''; return; }
         if (i > 0) { emit(pending.slice(0, i)); pending = pending.slice(i); }
         const j = pending.indexOf(']');
-        if (j < 0) { if (pending.length > 80) { emit(pending); pending = ''; } return; }
+        if (j < 0) { if (pending.length > 1024) { if (/^\[\s*hledat\s*:/i.test(pending)) { stopped = true; onSearch(pending.replace(/^\[\s*hledat\s*:/i, '').slice(0, 200)); } else emit(pending); pending = ''; } return; }
         const tag = pending.slice(0, j + 1); pending = pending.slice(j + 1);
         const m = tag.match(/^\[\s*hledat\s*:\s*(.+?)\s*\]$/i);
-        if (m) { pending = ''; onSearch(m[1]); return; }
+        if (m) { stopped = true; pending = ''; onSearch(m[1].slice(0, 200)); return; }
         emit(tag);
       }
     },
-    flush() { if (pending) emit(pending); pending = ''; },
+    flush() { if (pending && !stopped) emit(pending); pending = ''; },
   };
 }
 
-function runSearch(query) {
+function runSearch(query, signal) {
   return new Promise(resolve => {
     execFile(SEARCH_PY, ['-I', path.join(__dirname, 'search.py'), query],
-      { timeout: 30000, maxBuffer: 1 << 20,
+      { timeout: 30000, maxBuffer: 1 << 20, signal,
         env: { ...process.env, SEARXNG_URL: CFG.search?.searxng_url || '', SEARCH_FALLBACK_PATH: CFG.search?.fallback_path || '' } },
       (err, out) => {
         if (err) return resolve({ query, results: [], error: String(err.message).slice(0, 200) });
@@ -138,7 +149,7 @@ function formatResults(s) {
   if (!s.results?.length && !s.answers?.length) return `Hledání „${s.query}“ nic nenašlo${s.error ? ' (chyba sítě)' : ''}.`;
   const answers = (s.answers || []).map(a => '[rychlá odpověď] ' + a).join('\n');
   const results = (s.results || []).map((r, i) => `(${i + 1}) ${r.title}${r.date ? ' [' + r.date + ']' : ''}\n${r.url}\n` +
-    `Úryvek: ${r.snippet || '-'}${r.text ? '\nZe stránky: ' + r.text.slice(0, 1500) : ''}`).join('\n\n');
+    `Úryvek: ${r.snippet || '-'}${r.text ? '\nZe stránky: ' + r.text.slice(0, 6500) : ''}`).join('\n\n');
   return [answers, results].filter(Boolean).join('\n\n');
 }
 
@@ -153,9 +164,16 @@ async function handleChat(req, res) {
     .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
   if (!history.length || history[history.length - 1].role !== 'user') return json(res, 400, { error: 'chybí zpráva' });
 
+  // Oprávnění platí jen pro tuto zprávu; historie ani klientský state ho nemohou udělit.
+  const searchAllowed = !!searchRequest(history[history.length - 1].content);
   const st = body.state || {};
   const num = (v, lo, hi) => (Number.isFinite(+v) ? Math.max(lo, Math.min(hi, +v)) : null);
+  const {roleplayPreference} = await conversationMode;
+  const roleplayPaused = typeof st.roleplayPaused === 'boolean'
+    ? roleplayPreference(history[history.length-1].content,st.roleplayPaused)
+    : history.filter(m=>m.role==='user').reduce((v,m)=>roleplayPreference(m.content,v),false);
   const ctx = {
+    searchAllowed, normalConversation:roleplayPaused,
     instability: num(st.instability, 0, 100) || 0,
     localTime: typeof st.localTime === 'string' ? st.localTime.slice(0, 40) : null,
     weekday: typeof st.weekday === 'string' ? st.weekday.slice(0, 20) : null,
@@ -165,6 +183,7 @@ async function handleChat(req, res) {
     tabLeaves: num(st.tabLeaves, 0, 1e4),
     interrupted: st.interrupted === true,
     viaVoice: st.viaVoice === true,
+    liveVoice: st.liveVoice === true && st.viaVoice === true,
     ambience: ['ticho', 'mírný ruch', 'hluk'].includes(st.ambience) ? st.ambience : null,
     // pojistka: krizová slova v poslední zprávě → výrazné upozornění v KONTEXTU
     crisis: detectCrisis ? detectCrisis(history[history.length - 1].content) : false,
@@ -173,69 +192,144 @@ async function handleChat(req, res) {
     device: describeDevice(req.headers['user-agent']),
     gpu: gpu ? `${gpu.temp} °C, vytížení ${gpu.util} %, paměť ${Math.round(gpu.mem / 1024)} z ${Math.round(gpu.total / 1024)} GB` : null,
   };
-  const mem = body.memory || {};
-  const strings = (arr, n, len) => (Array.isArray(arr) ? arr : []).filter(s => typeof s === 'string').slice(-n).map(s => s.slice(0, len));
-  const memory = { facts: strings(mem.facts, 100, 300), diary: strings(mem.diary, 50, 2000) };
+  const core = await memoryCore;
+  const memory = core.selectMemory(core.normalizeMemory(body.memory || {}), history[history.length - 1].content);
   // Proměnlivý kontext jen do poslední zprávy → začátek promptu zůstává stejný a llama.cpp ho vezme z cache.
   const last = history[history.length - 1];
   const messages = [{ role: 'system', content: buildSystemPrompt(memory) }, ...history.slice(0, -1),
     { role: 'user', content: buildContextNote(ctx) + '\n\n' + last.content }];
 
   res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
-  const send = obj => res.write('data: ' + JSON.stringify(obj) + '\n\n');
+  const send = obj => { if (!res.destroyed && !res.writableEnded) res.write('data: ' + JSON.stringify(obj) + '\n\n'); };
   let controller = new AbortController();
-  req.on('close', () => { if (!res.writableEnded) controller.abort(); });
+  res.once('close', () => { if (!res.writableEnded) controller.abort(); });
 
+  const requestId = randomUUID(), started = Date.now();
+  const log = (event, details = {}) => console.log(JSON.stringify({ at: new Date().toISOString(), requestId, event, ...details }));
+  log('chat_start', { chars: last.content.length, live: ctx.liveVoice, phase: ctx.instability, historyMessages: history.length, searchAllowed });
+  send({ requestId });
+  async function research(query) {
+    // Poslední kontrola přímo před externím nástrojem; model tuto hranici nemůže obejít.
+    if (!searchAllowed || ctx.crisis) {
+      log('search_blocked', { reason: 'no_current_permission' });
+      throw new Error('Hledání nebylo v této zprávě vyžádáno');
+    }
+    if (res.destroyed || controller.signal.aborted) return;
+    log('search_start', { queryChars: query.length, contextualMessages: history.slice(0, -1).filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-12).length });
+    send({ search: query });
+    const searchAt = Date.now(), result = await runSearch(query, controller.signal);
+    if (res.destroyed || controller.signal.aborted) return;
+    const sources = (result.results || []).slice(0, 6).map(r => ({ title: r.title, url: r.url }));
+    send({ sources });
+    log('search_end', { results: sources.length, error: !!result.error, ms: Date.now() - searchAt });
+    if (!sources.length && !result.answers?.length) {
+      send({ t: result.error ? '[sad] Hledání se teď nepodařilo dokončit kvůli chybě služby. Nemám ověřené výsledky, které bych ti mohla předat. [posun:0]' : '[sad] Hledání nepřineslo použitelné výsledky, takže ti teď nemám z čeho sestavit ověřenou odpověď. [posun:0]' });
+      log('research_answer', { outcome: result.error ? 'search_error' : 'no_results' });
+      return;
+    }
+    const question = last.content, count = requestedCount(question);
+    const recentConversation = history.slice(0, -1).filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-12).map(m => ({ role: m.role, content: m.content.replace(/\[(?:hledat|pamatuj|zapomeň|posun):[^\]]*\]/gi, '').slice(0, 4000) }));
+    const context = { question, recentConversation, knownUserFacts: memory.facts, searchQuery: query, results: formatResults(result), date: new Date().toLocaleDateString('cs-CZ'), phase: ctx.instability };
+    const researchMessages = [{ role: 'system', content: RESEARCH_PROMPT }, { role: 'user', content: JSON.stringify(context) }];
+    let maxTokens = outputBudget(question, Math.max(768, CFG.llm.max_tokens || 320));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let answer = '';
+      send({ thinking: true });
+      const outcome = await streamLLM(researchMessages, t => { answer += t; }, controller, () => {}, false, { maxTokens });
+      send({ thinking: false });
+      if (res.destroyed || controller.signal.aborted) return;
+      const problem = researchProblem(answer, outcome?.finishReason, count);
+      if (!problem) {
+        send({ t: cleanResearch(answer) });
+        log('research_answer', { outcome: 'complete', attempt: attempt + 1, chars: answer.length, maxTokens, finishReason: outcome?.finishReason });
+        return;
+      }
+      if (attempt === 1 && problem === 'incomplete_list') {
+        const found = Array.from(answer.matchAll(/(?:^|\n)\s*(?:\[[^\]]+\]\s*)?\d{1,2}[.)]\s+\S/g)).length;
+        if (found > 0) {
+          send({ t: cleanResearch(answer.replace(/\[posun:[^\]]+\]/g, '') + '\n\nSeznam zatím obsahuje jen ' + found + ' z požadovaných ' + count + ' položek. Další z dostupných podkladů nemám ověřené.') });
+          log('research_answer', { outcome: 'partial_list', found, requested: count });
+          return;
+        }
+      }
+      log('research_repair', { reason: problem, attempt: attempt + 1 });
+      researchMessages.push({ role: 'assistant', content: answer }, { role: 'user', content: 'Předchozí odpověď nebyla dokončená. Napiš celou konečnou odpověď znovu, pouze z již dodaných podkladů. Nehledej znovu. Dodrž požadovaný počet položek, nebo konkrétně přiznej chybějící podklady. Začni přirozeným oznámením výsledku hledání a skonči [posun:0].' });
+      maxTokens = Math.min(2000, Math.max(960, maxTokens * 2));
+    }
+    throw new Error('Z výsledků se nepodařilo sestavit úplnou odpověď');
+  }
   try {
-    // Router: zjevný dotaz na aktuální informace → vyhledat ještě před odpovědí (model by si jinak
-    // počasí nebo výsledky občas vymyslel). Model pak dostane výsledky přímo k poslední zprávě.
-    const routed = detectSearch ? detectSearch(last.content) : null;
-    // Přemýšlení (reasoning): u Qwenu +2 body kvality za ~14× delší odpověď (1,5 s → 22 s); Gemma 4
-    // má bez přemýšlení skóre 99 a přemýšlí ještě déle (fotka 6,6 s → 28 s). Režim „auto“ proto
-    // přemýšlí jen u delší zprávy nebo výslovné prosby o pomoc/vysvětlení; fotky, hledání i výpočty jsou rychlé.
+    const contextual = history.slice(0, -1).some(m => m.role === 'user' && !m.content.startsWith('[[UDÁLOST]]')) && needsConversation(last.content);
+    const routed = !image ? detectSearch(last.content) : null;
     const mode = ['off', 'auto', 'on'].includes(body.thinking) ? body.thinking : (CFG.llm.thinking === true ? 'on' : CFG.llm.thinking || 'auto');
-    const think = mode === 'on' || (mode === 'auto' && !last.content.startsWith('[[') && !ctx.crisis &&
-      (last.content.length > 160 ||
-       /(^|[^\p{L}])(vysvětli|vysvětlit|napiš|napsat|poraď|pomoz|pomoct|proč|jak (to|mám|se dá|funguje)|přelož|spočítej|porovnej|navrhni|shrň|oprav)(?!\p{L})/iu.test(last.content)));
-    if (routed) {
-      send({ search: routed });
-      const result = await runSearch(routed);
-      send({ sources: (result.results || []).slice(0, 3).map(r => ({ title: r.title, url: r.url })) });
-      messages[messages.length - 1].content += `
-
-[[VÝSLEDKY HLEDÁNÍ „${routed}“ – vidíš je jen ty. Dnes je ${new Date().toLocaleDateString('cs-CZ')}, ` +
-        `ignoruj zastaralé údaje.]]
-${formatResults(result)}`;
+    const think = mode === 'on' || (mode === 'auto' && !ctx.liveVoice && !last.content.startsWith('[[') && !ctx.crisis &&
+      (last.content.length > 160 || /(^|[^\p{L}])(vysvětli|vysvětlit|napiš|napsat|poraď|pomoz|pomoct|proč|jak (to|mám|se dá|funguje)|přelož|spočítej|porovnej|navrhni|shrň|oprav)(?!\p{L})/iu.test(last.content)));
+    if (routed && !ctx.crisis) {
+      let resolvedQuery = routed;
+      if (contextual) {
+        const recentConversation = history.slice(0, -1).filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-12);
+        let planning = '';
+        send({ thinking: true });
+        await streamLLM([{ role: 'system', content: QUERY_PROMPT }, { role: 'user', content: JSON.stringify({ question: last.content, recentConversation }) }], t => { planning += t; }, controller, () => {}, false, { maxTokens: 256, responseFormat: { type: 'json_object' } });
+        send({ thinking: false });
+        if (res.destroyed || controller.signal.aborted) return res.end();
+        let parsed;
+        try { parsed = JSON.parse(planning); } catch { throw new Error('Nepodařilo se upřesnit návaznost dotazu'); }
+        resolvedQuery = typeof parsed.query === 'string' ? parsed.query.trim().slice(0, 200) : '';
+        log('query_resolution', { outcome: resolvedQuery ? 'resolved' : 'clarification', historyMessages: recentConversation.length });
+        if (!resolvedQuery) {
+          const clarification = typeof parsed.clarification === 'string' ? parsed.clarification.slice(0, 300) : '';
+          send({ t: cleanResearch('[curious] ' + (clarification || 'Ke kterému tématu z předchozího rozhovoru se má hledání vztahovat?')) });
+        }
+      }
+      if (resolvedQuery) await research(resolvedQuery);
+    } else {
+      if (image) {
+        const m = messages[messages.length - 1];
+        m.content = [{ type: 'text', text: m.content }, { type: 'image_url', image_url: { url: image } }];
+      }
+      const canSearch = searchAllowed && !ctx.crisis;
+      // Bez svolení držíme text do kontroly značek: ani slib "hledám" se nesmí
+      // dostat do přehrávání, pokud se model pokusí spustit zakázaný nástroj.
+      for (let attempt = 0; attempt < (canSearch ? 1 : 2); attempt++) {
+        let query = null, draft = '';
+        if (!canSearch) send({ thinking: true });
+        const filter = makeTagFilter(t => { if (canSearch) send({ t }); else draft += t; },
+          q => { query = q; controller.abort(); });
+        await streamLLM(messages, t => filter.feed(t), controller,
+          on => { if (canSearch) send({ thinking: on }); }, attempt ? false : think);
+        if (!query) filter.flush();
+        if (res.destroyed || (!query && controller.signal.aborted)) break;
+        // Zachytíme i uříznutou značku, kterou filtr nemohl uzavřít.
+        const blocked = !canSearch && (query !== null || /\[\s*hledat\s*:/i.test(draft));
+        if (blocked) {
+          log('search_blocked', { reason: 'model_without_permission', attempt: attempt + 1 });
+          controller = new AbortController();
+          if (!attempt) {
+            messages[0] = { ...messages[0], content: messages[0].content +
+              '\n\nPRO TUTO ODPOVĚĎ JE WEB VYPNUTÝ. Uživatel nedal nový výslovný pokyn k hledání. Odpověz přímo na jeho poslední zprávu z rozhovoru a vlastních znalostí. Nic nevyhledávej, nepoužívej značku hledat a neslibuj hledání. Pokud aktuální údaj neznáš, přiznej to. Starší úkoly už znovu neprováděj.' };
+            continue;
+          }
+          send({ thinking: false });
+          send({ t: '[neutral] Hledání nechám vypnuté, dokud si o něj výslovně neřekneš. [posun:0]' });
+          break;
+        }
+        if (query !== null) {
+          controller = new AbortController();
+          await research(query);
+        } else if (!canSearch) {
+          send({ thinking: false });
+          if (draft) send({ t: draft });
+        }
+        break;
+      }
     }
-    // fotka: poslední zpráva jako text + obrázek (OpenAI formát, llama.cpp s mmproj)
-    if (image) {
-      const m = messages[messages.length - 1];
-      m.content = [{ type: 'text', text: m.content }, { type: 'image_url', image_url: { url: image } }];
-    }
-    let spoken = '', query = null;
-    const filter = makeTagFilter(t => { spoken += t; send({ t }); }, q => { query = q; controller.abort(); });
-    await streamLLM(messages, t => filter.feed(t), controller, on => send({ thinking: on }), think);
-    if (!query) filter.flush();
-
-    if (query && !res.destroyed) {
-      send({ search: query });
-      const result = await runSearch(query);
-      send({ sources: (result.results || []).slice(0, 3).map(r => ({ title: r.title, url: r.url })) });
-      controller = new AbortController();
-      req.on('close', () => { if (!res.writableEnded) controller.abort(); });
-      const followUp = [...messages,
-        { role: 'assistant', content: `${spoken}[hledat: ${query}]` },
-        { role: 'user', content: `[[UDÁLOST]] Výsledky tvého hledání „${query}“ (vidíš je jen ty). Dnes je ${new Date().toLocaleDateString('cs-CZ')} – ` +
-          `ignoruj zastaralé údaje ze starých stránek.\n\n${formatResults(result)}\n\n` +
-          'Teď plynule pokračuj ve své odpovědi – navaž na to, co jsi už řekla, neopakuj to. Začni značkou emoce, na konci [posun:N]. Už nehledej.' },
-      ];
-      const filter2 = makeTagFilter(t => send({ t }), () => controller.abort());
-      await streamLLM(followUp, t => filter2.feed(t), controller, on => send({ thinking: on }), think);
-      filter2.flush();
-    }
-    send({ done: true });
+    if (!res.destroyed && !controller.signal.aborted) {
+      send({ done: true });
+      log('chat_done', { ms: Date.now() - started });
+    } else log('chat_interrupted', { ms: Date.now() - started });
   } catch (e) {
-    console.error('[chat]', e.message);
+    log('chat_error', { name: e.name, ms: Date.now() - started });
     if (!res.destroyed) send({ error: 'Verity teď neodpovídá (' + e.message + ')' });
   }
   res.end();
@@ -244,67 +338,77 @@ ${formatResults(result)}`;
 // ── úklid paměti: které staré fakty nové fakty / zpráva vyvrací ──────────────
 // Model při psaní odpovědi [zapomeň: …] spolehlivě nepoužívá (testy 0–3 ze 3), proto se po přidání
 // nového faktu zeptá zvlášť, stroze a s teplotou 0. Vrací indexy starých faktů k odstranění.
-async function handleConsolidate(req, res) {
-  const body = await readBody(req, 64 * 1024);
-  const strs = (a, n) => (Array.isArray(a) ? a : []).filter(s => typeof s === 'string').slice(0, n).map(s => s.slice(0, 300));
-  const old = strs(body.facts, 100), added = strs(body.added, 10);
-  const message = typeof body.message === 'string' ? body.message.slice(0, 1500) : '';
-  if (!old.length || !added.length) return json(res, 200, { forget: [] });
-  const prompt = `Udržuješ seznam faktů o uživateli. Uživatel právě napsal: „${message}“\n` +
-    `Nově přidané fakty:\n${added.map(f => '- ' + f).join('\n')}\n\nStarší fakty (číslované):\n${old.map((f, i) => `${i}: ${f}`).join('\n')}\n\n` +
-    'Které starší fakty jsou teď NEPRAVDIVÉ nebo ZASTARALÉ, protože je zpráva nebo nové fakty vyvracejí, nahrazují nebo už proběhly ' +
-    '(přestěhování, změna práce, rozchod, zrušený nebo proběhlý plán, oprava omylu)? Fakty, které stále platí nebo s novými nesouvisí, NEUVÁDĚJ. ' +
-    'Odpověz pouze JSON {"zapomenout": [čísla]}; když žádný, prázdné pole.';
+// ── ověřené změny paměti z nové lidské zprávy ─────────────────────────────────
+async function handleMemory(req, res) {
+  const body = await readBody(req, 128 * 1024);
+  const message = typeof body.message === 'string' ? body.message.slice(0, 4000) : '';
+  if (!message.trim() || message.startsWith('[[')) return json(res, 200, { operations: [] });
+  const core = await memoryCore, now = Date.now();
+  const eligible = core.evidenceText(message);
+  if (!eligible.trim()) return json(res, 200, { operations: [] });
+  const at = Number.isFinite(body.at) ? Math.min(now, body.at) : now;
+  const memory = core.normalizeMemory(body.memory || {}, now);
+  const controller = new AbortController();
+  res.once('close', () => { if (!res.writableEnded) controller.abort(); });
   try {
     const r = await fetch(CFG.llm.url + '/v1/chat/completions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(60000),
-      body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 60,
-        chat_template_kwargs: { enable_thinking: false }, response_format: { type: 'json_object' } }),
-    });
-    const d = await r.json();
-    const c = d.choices?.[0]?.message?.content || '{}';
-    const ids = (JSON.parse(c.slice(c.indexOf('{'), c.lastIndexOf('}') + 1)).zapomenout || [])
-      .map(Number).filter(i => Number.isInteger(i) && i >= 0 && i < old.length && !added.includes(old[i]));
-    json(res, 200, { forget: [...new Set(ids)].map(i => old[i]) });
-  } catch (e) {
-    json(res, 200, { forget: [], error: e.message });
-  }
-}
-
-// ── deník: shrnutí staršího úseku rozhovoru ──────────────────────────────────
-async function handleSummarize(req, res) {
-  const body = await readBody(req, 512 * 1024);
-  const chunk = (Array.isArray(body.messages) ? body.messages : []).slice(0, 120)
-    .filter(m => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'));
-  if (!chunk.length) return json(res, 400, { error: 'prázdný úsek' });
-  const transcript = chunk.map(m => {
-    const text = m.content.replace(/\[(?!\[)[^\]]{0,200}\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1500);
-    if (m.role === 'assistant') return 'Verity: ' + text;
-    return text.startsWith('[[UDÁLOST]]') ? '(' + text.replace('[[UDÁLOST]]', '').trim() + ')' : 'Člověk: ' + text;
-  }).join('\n');
-  const previous = typeof body.previous === 'string' && body.previous ? `Tvůj předchozí zápis (pro návaznost): ${body.previous.slice(0, 2000)}\n\n` : '';
-  const known = (Array.isArray(body.facts) ? body.facts : []).filter(f => typeof f === 'string').slice(-100).map(f => '- ' + f.slice(0, 300)).join('\n');
-  try {
-    const r = await fetch(CFG.llm.url + '/v1/chat/completions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(180000),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),
       body: JSON.stringify({
-        messages: [{ role: 'system', content: SUMMARY_PROMPT },
-          { role: 'user', content: `${previous}Fakta, která už znáš:\n${known || '(žádná)'}\n\nÚsek rozhovoru:\n${transcript}` }],
-        temperature: 0.4, max_tokens: 700, chat_template_kwargs: { enable_thinking: false },
+        messages: [{ role: 'system', content: MEMORY_PROMPT }, { role: 'user', content: JSON.stringify({
+          message: eligible, date: new Date(at).toLocaleDateString('sv-SE', {timeZone:'Europe/Prague'}),
+          entries: memory.entries.map(({key,text,kind,updatedAt})=>({key,text,kind,updatedAt})),
+        }) }],
+        temperature: 0, max_tokens: 900, chat_template_kwargs: { enable_thinking: false },
         response_format: { type: 'json_object' },
       }),
     });
+    if (!r.ok) throw new Error('LLM HTTP ' + r.status);
     const d = await r.json();
-    const content = d.choices?.[0]?.message?.content || '';
-    let parsed = null;
-    try { parsed = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)); } catch { /* fallback níže */ }
-    const summary = String(parsed?.zapis || (parsed ? '' : content)).replace(/\[[^\]]*\]/g, '').trim();
-    const facts = (Array.isArray(parsed?.fakta) ? parsed.fakta : []).filter(f => typeof f === 'string' && f.trim()).slice(0, 15).map(f => f.trim().slice(0, 200));
-    if (!summary) return json(res, 502, { error: 'LLM nevrátilo shrnutí' });
-    json(res, 200, { summary: summary.slice(0, 2000), facts });
+    if (d.choices?.[0]?.finish_reason === 'length') throw new Error('Neúplná změna paměti');
+    const proposed = JSON.parse(d.choices?.[0]?.message?.content || '{}');
+    const operations = core.validateOperations(proposed.operations, message, memory, at, now);
+    if (!res.destroyed) json(res, 200, { operations });
   } catch (e) {
-    json(res, 502, { error: e.message });
+    if (!res.destroyed) json(res, 502, { error: 'Paměť se nepodařilo aktualizovat', operations: [] });
   }
+}
+
+// Starý klient musí obnovit stránku; paměťové značky už nejsou důvěryhodný zdroj.
+async function handleConsolidate(req, res) {
+  await readBody(req, 128 * 1024);
+  json(res, 200, { forget: [], deprecated: true });
+}
+
+// ── stručný archiv: ověřené citace, žádná výroba osobních faktů ────────────────
+async function handleSummarize(req, res) {
+  const body = await readBody(req, 512 * 1024);
+  const core = await memoryCore;
+  const messages = (Array.isArray(body.messages) ? body.messages : []).slice(0,120)
+    .filter(m=>m?.role==='user' && typeof m.content==='string' && !m.content.startsWith('[['))
+    .map(m=>({...m,content:core.evidenceText(m.content)})).filter(m=>m.content.trim())
+    .map((m,index)=>({index,content:m.content.slice(0,1500),at:Number(m.at)||Date.now()}));
+  if (!messages.length) return json(res,200,{summary:'',facts:[],verified:true});
+  const controller = new AbortController();
+  res.once('close',()=>{if(!res.writableEnded)controller.abort();});
+  try {
+    const r = await fetch(CFG.llm.url + '/v1/chat/completions', {
+      method:'POST',headers:{'Content-Type':'application/json'},
+      signal:AbortSignal.any([controller.signal,AbortSignal.timeout(20000)]),
+      body:JSON.stringify({messages:[{role:'system',content:SUMMARY_PROMPT},
+        {role:'user',content:JSON.stringify({messages})}],temperature:0,max_tokens:600,
+        chat_template_kwargs:{enable_thinking:false},response_format:{type:'json_object'}}),
+    });
+    if(!r.ok)throw new Error('LLM HTTP '+r.status);
+    const d=await r.json();
+    if(d.choices?.[0]?.finish_reason==='length')throw new Error('Neúplný výběr citací');
+    const parsed=JSON.parse(d.choices?.[0]?.message?.content||'{}');
+    const quotes=(Array.isArray(parsed.quotes)?parsed.quotes:[]).slice(0,4).filter(q=>
+      Number.isInteger(q.index)&&typeof q.quote==='string'&&q.quote.trim().length>=4&&
+      messages[q.index]?.content.includes(q.quote));
+    const summary=quotes.map(q=>'Uživatel: „'+q.quote.slice(0,400)+'“').join(' ');
+    if(!res.destroyed)json(res,200,{summary, facts:[], verified:true});
+  }catch(e){if(!res.destroyed)json(res,502,{error:'Nepodařilo se zkrátit historii'});}
 }
 
 // ── TTS ──────────────────────────────────────────────────────────────────────
@@ -353,12 +457,15 @@ async function handleTts(req, res) {
   const payload = { text, settings, streamer: 'verity', queue_timeout: 60 };
   if (cloning) payload.speaker_wav = refWav;
 
+  const controller = new AbortController();
+  res.once('close', () => { if (!res.writableEnded) controller.abort(); });
   try {
     let wav;
     for (let attempt = 0; attempt < 3; attempt++) {
+      if (controller.signal.aborted || res.destroyed) return;
       if (attempt) payload.settings.seed = (t.seed || 0) + attempt;
       const r = await fetch(t.url + '/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload), signal: AbortSignal.timeout(90000) });
+        body: JSON.stringify(payload), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(90000)]) });
       const d = await r.json();
       if (!r.ok || !d.audio_base64) return json(res, 502, { error: d.error || 'TTS selhalo' });
       wav = Buffer.from(d.audio_base64, 'base64');
@@ -369,7 +476,7 @@ async function handleTts(req, res) {
     res.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': wav.length, 'Cache-Control': 'no-store' });
     res.end(wav);
   } catch (e) {
-    json(res, 502, { error: 'TTS nedostupné: ' + e.message });
+    if (!controller.signal.aborted && !res.destroyed) json(res, 502, { error: 'TTS nedostupné: ' + e.message });
   }
 }
 
@@ -395,7 +502,7 @@ function cleanTranscript(text) {
   return sentences.join('').replace(/^[\s.,!?…-]+/, '').trim();
 }
 
-// ── STT: proxy na Whisper službu (config.stt.url) ─────────────────────────────
+// ── STT: proxy na Whisper (interní Windows služba) ────────────────────────
 // Interní klíč zná jen server; prohlížeč na Windows stroj nikdy nemluví přímo.
 async function handleStt(req, res) {
   if (!CFG.stt?.url || !CFG.stt?.key) return json(res, 503, { error: 'Přepis hlasu není nastavený.' });
@@ -410,6 +517,9 @@ async function handleStt(req, res) {
   const params = new URLSearchParams();
   if (q.get('live') === '1') params.set('live', '1');
   if (q.get('final') === '1') params.set('final', '1');
+  // Recording diagnostics are disabled, including requests from older open pages.
+  if (q.get('source') === '1') return json(res, 410, { debug_saved: false, error: 'Ukládání testovacích nahrávek je vypnuté.' });
+
   try {
     const r = await fetch(`${CFG.stt.url}/transcribe?${params}`, {
       method: 'POST', body: Buffer.concat(chunks), signal: AbortSignal.timeout(150000),
@@ -421,7 +531,8 @@ async function handleStt(req, res) {
     let peak = 0; for (let i = 0; i + 1 < pcm.length; i += 2) peak = Math.max(peak, Math.abs(pcm.readInt16LE(i)));
     console.log(`[stt] ${q.get('final') === '1' ? 'final' : 'live '} ${(d.duration ?? 0).toFixed?.(1) ?? d.duration}s ` +
       `peak ${(20 * Math.log10(peak / 32768 + 1e-9)).toFixed(0)} dBFS → ${r.status} ${String(d.text || '').length} znaků`);
-    json(res, r.status, r.ok ? { text: cleanTranscript(d.text), duration: d.duration } : { error: d.error || d.detail || 'Přepis selhal.' });
+    // The proxy never forwards a recording/debug flag to Windows.
+    json(res, r.status, r.ok ? { text: cleanTranscript(d.text), duration: d.duration, ...(q.get('debug') === '1' ? { debug_saved: false } : {}) } : { error: d.error || d.detail || 'Přepis selhal.' });
   } catch {
     json(res, 503, { error: 'Přepis hlasu je právě nedostupný. Můžeš napsat zprávu.' });
   }
@@ -436,7 +547,7 @@ function clientIp(req) {
   for (let i = chain.length - 1; i >= 0; i--) if (!PRIVATE.test(chain[i])) return chain[i];
   return chain[0] || req.socket.remoteAddress;
 }
-const LIMITS = { '/api/chat': 30, '/api/tts': 150, '/api/stt': 90, '/api/summarize': 6, '/api/consolidate': 30 };   // za minutu na IP
+const LIMITS = { '/api/chat': 30, '/api/tts': 150, '/api/stt': 90, '/api/summarize': 6, '/api/consolidate': 30, '/api/memory': 30 };   // za minutu na IP
 const buckets = new Map();
 let activePosts = 0;
 function overLimit(ip, route) {
@@ -464,6 +575,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/tts') return await handleTts(req, res);
     if (req.method === 'POST' && url.pathname === '/api/stt') return await handleStt(req, res);
     if (req.method === 'POST' && url.pathname === '/api/summarize') return await handleSummarize(req, res);
+    if (req.method === 'POST' && url.pathname === '/api/memory') return await handleMemory(req, res);
     if (req.method === 'POST' && url.pathname === '/api/consolidate') return await handleConsolidate(req, res);
     if (req.method === 'GET' && url.pathname === '/api/status') {
       const [llm, tts, stt] = await Promise.all([ping(CFG.llm.url + '/health'), ping(CFG.tts.url + '/health'),

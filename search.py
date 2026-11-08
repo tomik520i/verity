@@ -42,12 +42,23 @@ def _fold(s):
 
 
 def relevant(item, query):
-    """Bezpečný a k věci: žádný dospělý obsah a aspoň jedno společné slovo (kmen 5 znaků) s dotazem."""
+    """Rok ani obecný výraz žebříčku samy nesmějí potvrdit shodu tématu."""
     blob = ' '.join([item.get('title', ''), item.get('snippet', ''), item.get('url', '')])
     if ADULT.search(blob):
         return False
-    stems = {_fold(w)[:5] for w in re.findall(r'\w{4,}', query) if w.lower() not in STOP}
-    return not stems or any(st in _fold(blob) for st in stems)
+    folded = _fold(blob)
+    stop = {_fold(w) for w in STOP} | {'nejlepsi', 'nejlepsich', 'nejhorsi', 'nejhorsich', 'najlepsie', 'roku', 'rok', 'seznam', 'top', 'zebricek'}
+    terms = {_fold(w) for w in re.findall(r'\w{3,}', query) if not w.isdigit() and _fold(w) not in stop}
+    if not terms:
+        return False  # pouze rok / obecné zadání nemá dost konkrétní téma
+    game_terms = {'hra', 'hry', 'her', 'hru', 'videohry', 'videoher', 'games', 'game'}
+    gaming = bool(terms & game_terms)
+    if gaming and not re.search(r'\b(?:hr[ayu]|her\w*|videoh\w*|gam(?:e|es|ing))\b', folded):
+        return False
+    terms -= game_terms
+    if gaming and not terms:
+        return True
+    return any(re.search(r'\b' + re.escape(t[:5]), folded) for t in terms)
 
 
 def ddgs_search(query, max_results=6):
@@ -105,7 +116,7 @@ def fallback_search(query):
     return [h for h in out if relevant(h, query)]
 
 
-def fetch_text(url, max_chars=1800):
+def fetch_text(url, max_chars=9000):
     r = requests.get(url, headers=HEADERS, timeout=8)
     r.raise_for_status()
     ctype = r.headers.get('Content-Type', '').lower()
@@ -159,8 +170,9 @@ def main():
         except Exception:
             pass
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        list(pool.map(enrich, merged[:3]))
+    targets = merged[:6] if re.search(r'nejlep|nejhors|nejleps|best|worst|\btop\b|zebricek', _fold(query)) else merged[:3]
+    with ThreadPoolExecutor(max_workers=max(1, len(targets))) as pool:
+        list(pool.map(enrich, targets))
     out = {'query': query, 'answers': answers, 'results': merged}
     if errors and not merged:
         out['error'] = '; '.join(errors)

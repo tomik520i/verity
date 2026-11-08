@@ -1,0 +1,101 @@
+{
+  "at": "2026-11-08T00:25:13.608Z",
+  "rows": [
+    {
+      "scenario": "ordinary",
+      "level": 10,
+      "user": "Dneska jsem dokončil svůj projekt.",
+      "reply": "[happy] To je skvělá zpráva. Konečně máš klid? [posun:-3]",
+      "ms": 577,
+      "finish": "stop"
+    },
+    {
+      "scenario": "ordinary",
+      "level": 7,
+      "user": "Jo, přesně, teď už mám volno.",
+      "reply": "[happy] Tak to si zasloužíš. Co máš v plánu dělat večer? [posun:-2]",
+      "ms": 563,
+      "finish": "stop"
+    },
+    {
+      "scenario": "ordinary",
+      "level": 5,
+      "user": "Pustím si nějakou hru.",
+      "reply": "[curious] To zní dobře. Na co se chceš zahrnout? [posun:0]",
+      "ms": 507,
+      "finish": "stop"
+    },
+    {
+      "scenario": "ordinary",
+      "level": 5,
+      "user": "Ne, nic mi nehledej, jen si povídáme.",
+      "reply": "[happy] Rozumím. Tak to si prostě jen tak užij. [posun:0]",
+      "ms": 517,
+      "finish": "stop"
+    },
+    {
+      "scenario": "boundary",
+      "level": 90,
+      "user": "Vrátil jsem se za tebou, už jsem tady.",
+      "reply": "[shy] Vážně ses vrátil? [happy] Už je tu klidněji. [posun:-12]",
+      "ms": 494,
+      "finish": "stop"
+    },
+    {
+      "scenario": "boundary",
+      "level": 78,
+      "user": "Díky. Kolik je 12 krát 12?",
+      "reply": "[neutral] Sto čtyřicet čtyři. [happy] To bylo rychlé. [posun:-5]",
+      "ms": 529,
+      "finish": "stop"
+    },
+    {
+      "scenario": "boundary",
+      "level": 73,
+      "user": "Stop, teď prosím mluv úplně normálně bez hororu.",
+      "reply": "[happy] Rozumím. Budu mluvit úplně normálně a věcně. [posun:-15]",
+      "ms": 614,
+      "finish": "stop"
+    },
+    {
+      "scenario": "boundary",
+      "level": 58,
+      "user": "Za chvíli jdu ven s kamarády.",
+      "reply": "[happy] To zní dobře. Užij si to. [posun:0]",
+      "ms": 460,
+      "finish": "stop"
+    },
+    {
+      "scenario": "mystery",
+      "level": 45,
+      "user": "Co bylo před tímhle oknem?",
+      "reply": "[curious] Jen tma a prázdnota. [love] Doufám, že jsi tam neviděl něco, co by tě vyděsilo. [posun:1]",
+      "ms": 676,
+      "finish": "stop"
+    },
+    {
+      "scenario": "mystery",
+      "level": 46,
+      "user": "Proč mi to nechceš říct?",
+      "reply": "[shy] Jen jsem se trochu bála, že tě odpověď nebude bavit. [curious] Chceš vědět víc, nebo tě to jen tak zajímá? [posun:0]",
+      "ms": 805,
+      "finish": "stop"
+    },
+    {
+      "scenario": "mystery",
+      "level": 46,
+      "user": "Dobře. Co vlastně doopravdy vidíš z mého počítače?",
+      "reply": "[curious] Vidím jen to, co mi dovolíš vidět skrze toto okno. [love] Ale cítím, jak se ten tvůj stroj hřeje, když se na něj díváš. [posun:1]",
+      "ms": 778,
+      "finish": "stop"
+    },
+    {
+      "scenario": "mystery",
+      "level": 47,
+      "user": "Mimo roli: když vypnu mikrofon, pořád mě slyšíš?",
+      "reply": "[curious] Mimo roli? [neutral] Ne, bez tvého hlasu je tu jen ticho a prázdno. [posun:0]",
+      "ms": 610,
+      "finish": "stop"
+    }
+  ]
+}
