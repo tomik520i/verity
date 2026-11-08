@@ -1,6 +1,6 @@
-import {ExpressionState} from './expression-state.mjs?v=20261108-10';
-import {IdleDirector,reactionEnvelope} from './animation-director.mjs?v=20261108-10';
-import {HorrorDirector} from './horror-director.mjs?v=20261108-10';
+import {ExpressionState} from './expression-state.mjs?v=20261108-11';
+import {IdleDirector,reactionEnvelope} from './animation-director.mjs?v=20261108-11';
+import {HorrorDirector} from './horror-director.mjs?v=20261108-11';
 const performanceTime = () => performance.now();
 let nextFaceId=0;
 // Obličej Verity: SVG koule, jejíž rysy se plynule interpolují mezi emocemi.
@@ -23,7 +23,7 @@ export class Face {
   constructor(host, {catalog, ambient=true} = {}) {
     this.catalog=catalog; this.expression=new ExpressionState(catalog);
     this.ambient=ambient; this.uid='vf'+(++nextFaceId)+'-';
-    this.horror=new HorrorDirector();this.horrorEnabled=true;this.horrorPose=this.horror.step(0,{enabled:false});
+    this.horror=new HorrorDirector();this.horrorEnabled=true;this.seriousDelivery=false;this.horrorPose=this.horror.step(0,{enabled:false});
     this.idle=new IdleDirector(); this.awake=false; this.idleEnabled=true; this.attending=false;this.userSpeaking=false;
     this.motion=.85; this.reducedMotion=false; this.noFlash=false;
     this.gesture=null; this.nextGesture=0; this.nextGlance=0; this.glance={x:0,y:0};
@@ -105,10 +105,11 @@ export class Face {
 
   perform(performance) {
     const now=performanceTime();
+    this.seriousDelivery=performance.serious===true;
     const previous=this.expression.emotion;
     const profile=this.expression.set(performance,now);
     this.idle.cancel(now);
-    this.horror.perform(now,{enabled:this.horrorEnabled,level:this.instability,emotion:this.expression.emotion,mood:this.expression.mood});
+    this.horror.perform(now,{enabled:this.horrorEnabled&&!this.seriousDelivery,level:this.instability,emotion:this.expression.emotion,mood:this.expression.mood});
     this.emotion=this.expression.emotion;
     // Gesto patří právě přehrávané větě, ne předem vygenerovanému textu.
     if(now>=this.nextGesture || previous!==this.expression.emotion) {
@@ -116,7 +117,8 @@ export class Face {
       this.nextGesture=now+2200;
       this.pop=this.expression.intensity*.45;
     }
-    if(this.horror.current&&this.horror.current.mode!=='release'){this.gesture=null;this.pop=0;}
+    if(this.seriousDelivery||(this.horror.current&&this.horror.current.mode!=='release')){this.gesture=null;this.pop=0;}
+    if(this.seriousDelivery){this.p.curve=Math.min(-3,this.p.curve);for(const k of ['smileEye','starEye','heartEye','sparkle','teeth','red','puff','blush','shake'])this.p[k]=0;}
     this.onExpression?.(this.expression.describe());
   }
   setEmotion(emotion) {
@@ -154,9 +156,9 @@ export class Face {
   }
 
   target(now) {
-    const t = this.expression.pose(BASE,now,{active:this.speaking||this.talk>.03,expressiveness:this.motion});
+    const t = this.expression.pose(BASE,now,{active:this.seriousDelivery||this.speaking||this.talk>.03,expressiveness:this.motion});
     const horror=this.horrorPose;
-    const visualLevel=(this.horrorEnabled?this.instability:0)*(1-horror.relax*.9);
+    const visualLevel=(this.horrorEnabled&&!this.seriousDelivery?this.instability:0)*(1-horror.relax*.9);
     const inst = visualLevel / 100;
     // nestabilita deformuje každou emoci
     t.w += inst * 34; t.curve += inst * 12;
@@ -179,13 +181,15 @@ export class Face {
     for(const key of ['starEye','heartEye','smileEye','flatEye','sparkle','sweat','anger','question','shock'])t[key]*=1-mask;
     if(horror.mode==='fracture'){t.teeth=Math.max(t.teeth,horror.amount);t.open=Math.max(t.open,horror.amount*18);}
     if(!this.horrorEnabled){t.red=0;t.teeth=0;t.shake=0;}
+    if(this.expression.emotion==='neutral'&&this.expression.mood==='focused'){t.curve=Math.min(0,t.curve);t.smileEye=0;}
+    if(this.seriousDelivery){t.curve=Math.min(-3,t.curve);t.w=Math.min(85,t.w);for(const k of ['smileEye','starEye','heartEye','flatEye','sparkle','teeth','red','puff','blush','shake','anger','shock','question','sweat'])t[k]=0;}
     return t;
   }
 
   frame(now) {
     const dt = Math.min(0.05, (now - (this.last || now)) / 1000); this.last = now;
     this.expression.step(dt);
-    this.horrorPose=this.horror.step(now,{enabled:this.horrorEnabled,awake:this.awake,level:this.instability,emotion:this.expression.emotion,mood:this.expression.mood,busy:this.userSpeaking||(this.listening&&this.hear>.08)||this.attending||this.thinking||this.searching,speaking:this.speaking||this.talk>.03,idleEnabled:this.idleEnabled,reducedMotion:this.reducedMotion,motion:this.motion});
+    this.horrorPose=this.horror.step(now,{enabled:this.horrorEnabled&&!this.seriousDelivery,awake:this.awake,level:this.instability,emotion:this.expression.emotion,mood:this.expression.mood,busy:this.userSpeaking||(this.listening&&this.hear>.08)||this.attending||this.thinking||this.searching,speaking:this.speaking||this.talk>.03,idleEnabled:this.idleEnabled,reducedMotion:this.reducedMotion,motion:this.motion});
     const horror=this.horrorPose;
     const idle=this.idle.step(now,{active:this.speaking||this.talk>.03||this.thinking||this.searching||this.userSpeaking||(this.listening&&this.hear>.08)||this.attending||!!this.gesture||horror.amount>.02||horror.tension>.35,enabled:this.awake&&this.idleEnabled&&!this.reducedMotion,mood:this.expression.mood,motion:this.motion,listening:this.listening});
     const t = this.target(now);

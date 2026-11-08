@@ -16,6 +16,8 @@ LLM, přepis i hlas běží na vlastním hardwaru. Hledání na internetu použ�
 
 - **Titulky i přepis současně** – pod postavou jsou řádky Verity / Ty. Poslední výměna zůstává vidět po domluvení; úplnou historii otevře Přepis.
 - **Místní test citlivosti** – otevření nastavení zapne mikrofon jen pro měřák dBFS, pravděpodobnosti řeči a živý práh. Žádný zvuk z testu nejde do Whisperu či Verity; zavřením se mikrofon uvolní.
+- **Automatický diagnostický log** – správce může načíst nové rozhovory, emoce, hledání a přehrávání přes chráněný endpoint bez ručního exportu. Retence sedm dní, bez souborů audia a obrázků. [Přístup a provoz](docs/DIAGNOSTIKA.md).
+- **Emoce podle obsahu** – výsledky hledání a fotky dostávají vlastní výraz; tragické zprávy mají střídmé podání bez úsměvu. [Popis a ověření](docs/EMOCE-PODLE-OBSAHU.md).
 - **Stav práce** – poslouchání, přepis, přemýšlení, hledání, mluvení, dokončení a chyba.
 
 - **Anime výrazy a gesta** – 29 emocí včetně komického uražení, sedm pomalejších nálad, hvězdičkové/srdíčkové oči, kapičky, ruměnec, úleky a pružné pohyby. Gesta začínají s přehrávanou větou. [Úplný seznam emocí](docs/EMOCE.md).
@@ -191,7 +193,7 @@ node bench/roleplay-dialogue.mjs http://localhost:8080 rozhovory.json
 
 ## Data, soukromí a licence
 
-Historie, nastavení a paměť zůstávají v localStorage konkrétního prohlížeče. Běžný mikrofonní rozhovor odesílá audio k Whisperu již během přepisu; místní test v nastavení nikoli. Diagnostické ukládání WAV je vypnuté a nemá veřejný přepínač. Repo neobsahuje klíče, produkční konfiguraci, hlasové reference, osobní exporty ani nahrávky.
+Historie, nastavení a paměť jsou v localStorage konkrétního prohlížeče. V aktuálním nasazení se navíc pro ladění uchovává text nových rozhovorů a průběh odpovědí v chráněném serverovém logu až sedm dní; podrobnosti a omezení jsou v [diagnostice](docs/DIAGNOSTIKA.md). Běžný mikrofonní rozhovor odesílá audio k Whisperu již během přepisu; místní test v nastavení nikoli. Diagnostické ukládání WAV je vypnuté a nemá veřejný přepínač. Repo neobsahuje klíče, produkční konfiguraci, hlasové reference, osobní exporty ani nahrávky.
 
 
 Kód je pod licencí MIT – viz [LICENSE](LICENSE). Modely a přibalené runtime soubory mají vlastní licence. Přesný přehled je v inventáři modelů a vendor-manifest.json.

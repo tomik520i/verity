@@ -93,3 +93,7 @@ Hlas zůstává stejný OmniVoice checkpoint. Emoce ovlivňují tempo a případ
 ## Hororová vrstva
 
 Nad těmito 29 emocemi funguje šest krátkých hororových reakcí. Nejsou to další názvy značek: řídí je výraz, rozpoložení a nestabilita. Vzhled, spouštění, podklady z předlohy a výsledky Gemmy jsou v samostatném **[seznamu hororových reakcí](HOROR.md)**.
+
+## Emoce ve zprávách a u fotografií
+
+Výraz se mění podle právě čteného obsahu i ve výsledcích hledání a při popisu více fotek. Závažný obsah má střídmé podání bez úsměvu. [Jak to funguje a co ukázaly skutečné testy](EMOCE-PODLE-OBSAHU.md).

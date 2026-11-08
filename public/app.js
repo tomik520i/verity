@@ -1,14 +1,16 @@
+import {conversationId,DiagnosticTrace} from './diagnostics-client.mjs?v=20261108-12';
 import { CaptionState } from './captions.mjs?v=20261108-5';
 import { roleplayPreference } from './conversation-mode.mjs?v=20261108-2';
 import { applyVoiceDefaults, microphoneLabel, needsEchoFallback, microphoneError } from './voice-preferences.mjs?v=20261108-2';
-import { Face } from './face.js?v=20261108-10';
-import {createPerformanceParser} from './performance-parser.mjs?v=20261108-10';
+import { Face } from './face.js?v=20261108-12';
+import {createPerformanceParser} from './performance-parser.mjs?v=20261108-12';
 import { normalizeMemory, pruneMemory, applyOperations, removeEntry, manualEntry, contextMessages } from './memory-core.mjs?v=20261108-1';
 import { setupPhoto } from './photo.js?v=20261108-6';
 import { MAX_IMAGES, requestImages } from './image-limits.mjs';
 import { describeActivity } from './activity.js?v=20261107-7';
 
-const expressionCatalog = await (await fetch(new URL('./emotions.json?v=20261108-10',import.meta.url))).json();
+const expressionCatalog = await (await fetch(new URL('./emotions.json?v=20261108-12',import.meta.url))).json();
+const diagnosticConversationId=conversationId();let activeTrace=null;
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -160,14 +162,14 @@ function musicFrame(now) {
 requestAnimationFrame(musicFrame);
 
 const ttsControllers = new Set();
-async function fetchTts(text, emotion, intensity=.65) {
+async function fetchTts(text, emotion, intensity=.65, trace=null, segment=0) {
   if (!voiceOn || !ttsOk || !actx) return null;
   const controller = new AbortController(); ttsControllers.add(controller);
   try {
     const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, emotion, intensity }), signal: controller.signal });
-    if (!r.ok) { activity.voiceFailed = true; return null; }
+    if (!r.ok) throw new Error('TTS HTTP '+r.status);
     return await actx.decodeAudioData(await r.arrayBuffer());
-  } catch (error) { if (!controller.signal.aborted) activity.voiceFailed = true; throw error; }
+  } catch (error) { if (!controller.signal.aborted) {activity.voiceFailed = true;trace?.report('tts_error',{segment,error:error.message});} throw error; }
   finally { ttsControllers.delete(controller); }
 }
 let echoOutput = null, echoRouteAbort = null;
@@ -230,13 +232,14 @@ let ttsChain = Promise.resolve(), bubble = null, doneWaiters = [], epoch = 0, wa
 const interruptibleSleep = ms => new Promise(r => { const t = setTimeout(r, ms); wakeSleep = () => { clearTimeout(t); r(); }; });
 function enqueue(seg) {
   seg.epoch = epoch;
-  const p = ttsChain.then(() => (seg.epoch === epoch ? fetchTts(seg.text, seg.emotion,seg.intensity) : null)).catch(() => null);
+  const p = ttsChain.then(() => (seg.epoch === epoch ? fetchTts(seg.text, seg.emotion,seg.intensity,seg.trace,seg.number) : null)).catch(() => null);
   ttsChain = p;
   seg.audio = p;
   queue.push(seg);
   if (!playing) playLoop();
 }
 function stopSpeech() {
+  if(activeTrace&&(playing||chatAbort))activeTrace.report('interrupted');
   epoch++; face.speaking=false; face.cancelGesture();
   echoOutput?.flush();
   for (const controller of ttsControllers) controller.abort();
@@ -258,6 +261,7 @@ async function playLoop() {
     if (!buf) spokenSoFar.push(`[${seg.emotion}:${Math.round(seg.intensity*100)}][mood:${seg.mood}] ${seg.text}`);
     face.thinking = false;
     face.perform(seg); face.speaking=true;
+    seg.trace?.report('playback_start',{segment:seg.number,text:seg.text,emotion:seg.emotion,mood:seg.mood,intensity:seg.intensity,serious:seg.serious,audio:!!buf});
     if (!bubble) bubble = addLog('verity', '');
     bubble.firstChild.textContent += (bubble.firstChild.textContent ? ' ' : '') + seg.text;
     scrollLog();
@@ -265,6 +269,7 @@ async function playLoop() {
     showSubtitle(seg.text, dur);
     if (buf) { await playBuffer(buf); if (seg.epoch === epoch) spokenSoFar.push(`[${seg.emotion}:${Math.round(seg.intensity*100)}][mood:${seg.mood}] ${seg.text}`); }
     else { fakeTalkUntil = performance.now() + dur * 0.85; await interruptibleSleep(dur); }
+    if(seg.epoch===epoch)seg.trace?.report('playback_end',{segment:seg.number,text:seg.text,emotion:seg.emotion,mood:seg.mood,intensity:seg.intensity,serious:seg.serious,audio:!!buf});
     face.speaking=false;
     await interruptibleSleep(120);
   }
@@ -321,6 +326,7 @@ let chatAbort = null, wasInterrupted = false;
 function interrupt() {
   if (!busy && !playing) return;
   wasInterrupted = true;
+  activeTrace?.report('interrupted');
   activity.outcome = 'interrupted'; activity.search = ''; activity.reasoning = false; activity.streaming = false;
   chatAbort?.abort();
   stopSpeech();
@@ -345,8 +351,9 @@ async function converse(content, isEvent = false, extra = {}, photos = []) {
   face.thinking = true;
   bubble = null; spokenSoFar = [];
   let raw = '', sources = null;
+  const trace=new DiagnosticTrace();activeTrace=trace;
   const controller = chatAbort = new AbortController();
-  const parser = makeParser(seg => { if (!controller.signal.aborted) enqueue(seg); }, d => setInstability(instability + d));
+  const parser = makeParser(seg => { if (!controller.signal.aborted) {seg.trace=trace;seg.number=++trace.segment;enqueue(seg);} }, d => setInstability(instability + d));
   const interruptedBefore = wasInterrupted; wasInterrupted = false;
   try {
     if (!isEvent) await updateMemory(content, messageAt, controller.signal);
@@ -354,7 +361,7 @@ async function converse(content, isEvent = false, extra = {}, photos = []) {
     const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
       body: JSON.stringify({
         messages: contextMessages(history, memory).map(({ role, content }) => ({ role, content })),
-        memory,
+        memory,conversationId:diagnosticConversationId,
         state: buildState({ ...extra, interrupted: interruptedBefore }),
         ...(photos.length ? { images: photos.map(p=>p.image) } : {}),
         thinking: extra.liveVoice && thinkMode === 'auto' ? 'off' : thinkMode,
@@ -370,6 +377,7 @@ async function converse(content, isEvent = false, extra = {}, photos = []) {
       while ((k = buf.indexOf('\n\n')) >= 0) {
         const line = buf.slice(0, k).replace(/^data:\s*/, ''); buf = buf.slice(k + 2);
         let ev; try { ev = JSON.parse(line); } catch { continue; }
+        if(ev.diagnostics)trace.accept(ev.diagnostics);
         if (ev.t) { activity.hasText = true; raw += ev.t; parser.feed(ev.t); }
         if (ev.search) { activity.search = String(ev.search); face.searching = true; }
         if ('thinking' in ev) activity.reasoning = !!ev.thinking;
@@ -381,6 +389,7 @@ async function converse(content, isEvent = false, extra = {}, photos = []) {
   } catch (e) {
     if (!controller.signal.aborted) {
       parser.end();
+      trace.report('client_error',{error:e.message});
       activity.failure = 'Spojení se přerušilo. Zkus zprávu odeslat znovu.';
       addLog('event', '· spojení se přerušilo ·');
       console.error(e);
@@ -403,6 +412,7 @@ async function converse(content, isEvent = false, extra = {}, photos = []) {
   }
   face.thinking = false;
   if (chatAbort === controller) chatAbort = null;
+  if(activeTrace===trace)activeTrace=null;
   busy = false; $('send').disabled = photoPreparing;
   activity.outcome = controller.signal.aborted ? 'interrupted' : activity.failure ? 'error' : 'done';
   lastVerityAt = Date.now();
@@ -977,6 +987,7 @@ setInterval(() => {
 async function pollStatus() {
   try {
     const s = await (await fetch('api/status', { cache: 'no-store' })).json();
+    for(const id of ['diagnostic-notice','diagnostic-notice-wake']){const el=$(id);if(el){el.hidden=!s.diagnostics?.enabled;el.textContent='Pro ladění se text rozhovoru a průběh odpovědí uchovává na serveru až '+(s.diagnostics?.retentionDays||7)+' dní. Fotky ani zvuk se do logu neukládají.';}}
     llmOk = s.llm; ttsOk = s.tts; sttOk = s.stt;
     if (s.gpu) $('st-gpu').textContent = `3090 · ${s.gpu.temp}°C`;
   } catch { llmOk = ttsOk = sttOk = false; }

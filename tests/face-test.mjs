@@ -31,3 +31,10 @@ face.reducedMotion=false;face.perform({emotion:'happy',intensity:1});face.speaki
 
 for(const mode of ['mask','stare','tilt','loom','fracture']){face.horrorEnabled=true;face.awake=true;face.instability=95;face.reducedMotion=false;face.listening=false;face.speaking=false;face.horror.easeUntil=0;face.horror.start(mode,time);for(let i=0;i<60;i++){time+=16;face.frame(time);}assert.ok(face.horrorPose.amount>0,mode);assert.ok(+face.horrorShadow.attributes.opacity>0,mode);}
 face.horrorEnabled=false;face.frame(time+16);assert.equal(face.horrorPose.amount,0);assert.equal(face.horrorShadow.attributes.opacity,'0');
+
+face.horrorEnabled=true;face.instability=100;face.perform({emotion:'happy',intensity:1,mood:'playful'});face.frame(time+32);
+face.perform({emotion:'empathetic',intensity:.35,mood:'gloomy',serious:true});
+assert.ok(face.p.curve<=0);assert.equal(face.p.smileEye,0);
+for(let i=0;i<300;i++){time+=16;face.frame(time);assert.ok(face.target(time).curve<=0);assert.equal(face.target(time).teeth,0);assert.equal(face.horrorPose.amount,0);}
+face.perform({emotion:'happy',intensity:.7,mood:'warm',serious:false});assert.equal(face.seriousDelivery,false);
+console.log('PASS immediate serious delivery overrides happy eyes, smile, horror and idle, and releases for a positive segment.');

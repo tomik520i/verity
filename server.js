@@ -9,6 +9,7 @@ const { buildSystemPrompt, buildContextNote, EMOTIONS, SUMMARY_PROMPT, detectCri
 
 const { searchRequest, detectSearch, needsConversation, QUERY_PROMPT, requestedCount, outputBudget, RESEARCH_PROMPT, cleanResearch, researchProblem } = require('./research');
 const { randomUUID } = require('crypto');
+const {createDiagnostics,clean:diagnosticText,UUID:DIAGNOSTIC_UUID}=require('./diagnostics');
 const { MEMORY_PROMPT } = require('./memory-prompts');
 const EXPRESSION_CATALOG=require('./public/emotions.json');
 const memoryCore = import('./public/memory-core.mjs');
@@ -20,6 +21,8 @@ const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf
 if (CFG.stt?.key_file) {
   try { CFG.stt.key = fs.readFileSync(CFG.stt.key_file, 'utf8').trim(); } catch { console.warn('[stt] chybí soubor s klíčem', CFG.stt.key_file); }
 }
+const diagnostics=createDiagnostics(__dirname,CFG.diagnostics);
+if(diagnostics.enabled)setInterval(()=>{try{diagnostics.prune();}catch{console.error('[diagnostics] cleanup failed');}},60000).unref();
 const PUBLIC = path.join(__dirname, 'public');
 const SEARCH_PY = CFG.search?.python || 'python3';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -175,7 +178,7 @@ async function handleChat(req, res) {
     ? roleplayPreference(history[history.length-1].content,st.roleplayPaused)
     : history.filter(m=>m.role==='user').reduce((v,m)=>roleplayPreference(m.content,v),false);
   const ctx = {
-    searchAllowed, normalConversation:roleplayPaused,
+    searchAllowed, imageCount:images.length, normalConversation:roleplayPaused,
     feedback:detectFeedback(history[history.length-1].content),
     mood:!roleplayPaused && Object.hasOwn(EXPRESSION_CATALOG.moods,st.mood) ? st.mood : 'warm',
     instability: num(st.instability, 0, 100) || 0,
@@ -204,14 +207,21 @@ async function handleChat(req, res) {
     { role: 'user', content: buildContextNote(ctx) + '\n\n' + last.content }];
 
   res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
-  const send = obj => { if (!res.destroyed && !res.writableEnded) res.write('data: ' + JSON.stringify(obj) + '\n\n'); };
+  let delivered='';
+  const send = obj => { if (!res.destroyed && !res.writableEnded) {if(obj.t)delivered=(delivered+obj.t).slice(0,24000);res.write('data: ' + JSON.stringify(obj) + '\n\n');} };
   let controller = new AbortController();
   res.once('close', () => { if (!res.writableEnded) controller.abort(); });
 
   const requestId = randomUUID(), started = Date.now();
-  const log = (event, details = {}) => console.log(JSON.stringify({ at: new Date().toISOString(), requestId, event, ...details }));
+  const conversationId=DIAGNOSTIC_UUID.test(body.conversationId||'')?body.conversationId:randomUUID();
+  const trace=(event,details={})=>diagnostics.append({type:'server',requestId,conversationId,event,...details});
+  let journalDone=false;
+  const finishTrace=interrupted=>{if(journalDone)return;journalDone=true;trace('output',{text:diagnosticText(delivered,24000),interrupted,ms:Date.now()-started});};
+  res.once('close',()=>{if(!res.writableEnded)finishTrace(true);});
+  trace('input',{text:diagnosticText(last.content,4000),imageCount:images.length,state:{instability:ctx.instability,mood:ctx.mood,normalConversation:ctx.normalConversation,viaVoice:ctx.viaVoice,searchAllowed},historyMessages:history.length});
+  const log = (event, details = {}) => {console.log(JSON.stringify({ at: new Date().toISOString(), requestId, event, ...details }));trace(event,details);};
   log('chat_start', { chars: last.content.length, live: ctx.liveVoice, phase: ctx.instability, historyMessages: history.length, searchAllowed });
-  send({ requestId });
+  send({ requestId, ...(diagnostics.enabled?{diagnostics:diagnostics.receipt(requestId,conversationId)}:{}) });
   async function research(query) {
     // Poslední kontrola přímo před externím nástrojem; model tuto hranici nemůže obejít.
     if (!searchAllowed || ctx.crisis) {
@@ -220,10 +230,12 @@ async function handleChat(req, res) {
     }
     if (res.destroyed || controller.signal.aborted) return;
     log('search_start', { queryChars: query.length, contextualMessages: history.slice(0, -1).filter(m => !m.content.startsWith('[[UDÁLOST]]')).slice(-12).length });
+    trace('search_query',{query:diagnosticText(query,300)});
     send({ search: query });
     const searchAt = Date.now(), result = await runSearch(query, controller.signal);
     if (res.destroyed || controller.signal.aborted) return;
     const sources = (result.results || []).slice(0, 6).map(r => ({ title: r.title, url: r.url }));
+    trace('sources',{sources:sources.map(x=>({title:diagnosticText(x.title,200),url:String(x.url||'').split('?')[0].slice(0,500)}))});
     send({ sources });
     log('search_end', { results: sources.length, error: !!result.error, ms: Date.now() - searchAt });
     if (!sources.length && !result.answers?.length) {
@@ -249,7 +261,7 @@ async function handleChat(req, res) {
         return;
       }
       if (attempt === 1 && problem === 'incomplete_list') {
-        const found = Array.from(answer.matchAll(/(?:^|\n)\s*(?:\[[^\]]+\]\s*)?\d{1,2}[.)]\s+\S/g)).length;
+        const found = Array.from(answer.matchAll(/(?:^|\n)\s*(?:\[[^\]]+\]\s*)*\d{1,2}[.)]\s+\S/g)).length;
         if (found > 0) {
           send({ t: cleanResearch(answer.replace(/\[posun:[^\]]+\]/g, '') + '\n\nSeznam zatím obsahuje jen ' + found + ' z požadovaných ' + count + ' položek. Další z dostupných podkladů nemám ověřené.') });
           log('research_answer', { outcome: 'partial_list', found, requested: count });
@@ -337,6 +349,7 @@ async function handleChat(req, res) {
     log('chat_error', { name: e.name, ms: Date.now() - started });
     if (!res.destroyed) send({ error: 'Verity teď neodpovídá (' + e.message + ')' });
   }
+  finishTrace(controller.signal.aborted||res.destroyed);
   res.end();
 }
 
@@ -553,7 +566,7 @@ function clientIp(req) {
   for (let i = chain.length - 1; i >= 0; i--) if (!PRIVATE.test(chain[i])) return chain[i];
   return chain[0] || req.socket.remoteAddress;
 }
-const LIMITS = { '/api/chat': 30, '/api/tts': 150, '/api/stt': 90, '/api/summarize': 6, '/api/consolidate': 30, '/api/memory': 30 };   // za minutu na IP
+const LIMITS = { '/api/diagnostics/events': 180, '/api/chat': 30, '/api/tts': 150, '/api/stt': 90, '/api/summarize': 6, '/api/consolidate': 30, '/api/memory': 30 };   // za minutu na IP
 const buckets = new Map();
 let activePosts = 0;
 function overLimit(ip, route) {
@@ -577,6 +590,14 @@ const server = http.createServer(async (req, res) => {
     activePosts++; res.once('close', () => activePosts--);
   }
   try {
+    if (req.method === 'GET' && url.pathname === '/api/diagnostics/logs') {
+      if(overLimit(clientIp(req),url.pathname))return json(res,429,{error:'Too many requests'});
+      if(!diagnostics.authorized(req.headers.authorization))return json(res,401,{error:'Unauthorized'});
+      return json(res,200,{...diagnostics.status(),records:diagnostics.read(Object.fromEntries(url.searchParams))});
+    }
+    if (req.method === 'POST' && url.pathname === '/api/diagnostics/events') {
+      const body=await readBody(req,12*1024),accepted=diagnostics.acceptClient(body);return json(res,accepted?200:403,{accepted});
+    }
     if (req.method === 'POST' && url.pathname === '/api/chat') return await handleChat(req, res);
     if (req.method === 'POST' && url.pathname === '/api/tts') return await handleTts(req, res);
     if (req.method === 'POST' && url.pathname === '/api/stt') return await handleStt(req, res);
@@ -586,7 +607,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/status') {
       const [llm, tts, stt] = await Promise.all([ping(CFG.llm.url + '/health'), ping(CFG.tts.url + '/health'),
         CFG.stt?.url ? ping(CFG.stt.url + '/health') : false]);
-      return json(res, 200, { llm, tts, stt, gpu, voice: CFG.tts.mode === 'clone' && fs.existsSync(CFG.tts.speaker_wav) ? 'clone' : 'design' });
+      return json(res, 200, { llm, tts, stt, gpu, diagnostics:diagnostics.status(), voice: CFG.tts.mode === 'clone' && fs.existsSync(CFG.tts.speaker_wav) ? 'clone' : 'design' });
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return json(res, 405, { error: 'method' });
     const rel = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);

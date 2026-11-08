@@ -468,3 +468,9 @@ Nastavení verity.expressiveness (0–100, výchozí 85) a verity.idleAnimations
 public/horror-director.mjs přidává k výrazu šest reakcí: mask, stare, tilt, loom, fracture a release. Bez síťových požadavků a zvuku; řízení přes Face.perform a fázi. Při přerušení se choreografie ruší, při poslechu/přemýšlení/hledání ustupuje. Uklidnění, focused/tender odpověď a soucit tlumí vysokou nestabilitu také vizuálně. roleplayPaused okamžitě nastaví horrorEnabled=false a klidný výraz. Omezení pohybu potlačí časované motivy; statický výraz zůstává.
 
 [Přehled hororu, zdroje a simulace](docs/HOROR.md). [Podrobná kompakce a paměť](docs/KONTEXT-A-PAMET.md) výslovně rozlišuje posledních 40 zpráv, výběr doložených citací po překročení 60 a dlouhodobá fakta. Archiv není souhrnem celého fikčního příběhu.
+
+## Emoce podle obsahu a automatické logy
+
+Research prompt už neomezuje výstup na happy/curious. Sanitizace zachovává povolené emoce a nálady mezi položkami, odstraňuje ostatní instrukční značky a vynucuje posun 0. Public/delivery-policy.mjs vyhodnocuje aktuální mluvený segment; závažný obsah dostává serious=true a renderer okamžitě potlačí úsměv, komické prvky, idle a horor. Neutrální věcný výraz nemá automatický úsměv. Fotky používají stejnou cestu; každá má vlastní herecké značky. [Podrobnosti a omezení](docs/EMOCE-PODLE-OBSAHU.md).
+
+Zapnutá diagnostika přidává chráněný GET /api/diagnostics/logs a podpisem omezený POST /api/diagnostics/events. Klient dostává v SSE krátkodobý podpis konkrétního tahu, nikoli správcovský čtecí klíč. Úložiště mimo public/Git uchovává text, serverové události a potvrzení přehrávání. Neuchovává obrázky, WAV ani reasoning. [Přesný provozní postup](docs/DIAGNOSTIKA.md). Předchozí popis čistě lokální historie se vztahuje k paměti a přepisu v prohlížeči; diagnostika je samostatná serverová kopie nových textových tahů.

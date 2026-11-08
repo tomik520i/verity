@@ -1,13 +1,14 @@
+import {deliveryPerformance} from './delivery-policy.mjs?v=20261108-12';
 import {expressionTag,clamp} from './expression-state.mjs';
 export function createPerformanceParser({catalog,onSegment,onShift=()=>{}}) {
   let pending='',cur='',emotion='neutral',intensity=.65,mood=null;
-  const send=text=>onSegment({text,emotion,intensity,mood:mood||catalog.emotions[emotion].mood});
+  const send=text=>onSegment(deliveryPerformance({text,emotion,intensity,mood:mood||catalog.emotions[emotion].mood}));
   const emit=force=>{
     for(;;) {
-      const m=cur.match(/^(.*?[.!?…]+["“”»]?)\s+(.*)$/s);
+      const m=cur.match(/^(.*?(?:[!?…]+|(?<!\d)\.+)["“”»]?)\s+(.*)$/s);
       if(!m)break;
       if(m[1].length<18&&!force) {
-        const rest=m[2].match(/^(.*?[.!?…]+["“”»]?)\s+(.*)$/s);
+        const rest=m[2].match(/^(.*?(?:[!?…]+|(?<!\d)\.+)["“”»]?)\s+(.*)$/s);
         if(!rest)break;
         send((m[1]+' '+rest[1]).trim());cur=rest[2];continue;
       }

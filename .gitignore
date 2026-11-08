@@ -17,3 +17,7 @@ venv/
 pipeline-fixture/
 verity-pamet-*.json
 *recording*
+
+# Private conversation diagnostics and read credential
+/diagnostics.key
+/var/diagnostics/

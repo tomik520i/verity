@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),temp=await fs.mkdtemp(path.join((await import('node:os')).tmpdir(),'verity-pipeline-'));
 await fs.mkdir(temp,{recursive:true});
 await fs.mkdir(path.join(temp,'public'),{recursive:true});
-for(const f of ['server.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs','public/image-limits.mjs','public/emotions.json'])await fs.copyFile(path.join(root,f),path.join(temp,f));
+for(const f of ['server.js','diagnostics.js','prompt.js','research.js','memory-prompts.js','public/memory-core.mjs','public/conversation-mode.mjs','public/image-limits.mjs','public/emotions.json'])await fs.copyFile(path.join(root,f),path.join(temp,f));
 const python=process.argv[2];
 await fs.writeFile(path.join(temp,'search.py'),"import json,sys,os,time\nq=sys.argv[1]\nwith open(os.path.join(os.path.dirname(__file__),'calls.txt'),'a') as f:f.write('search\\n')\nif 'CEKEJ' in q:time.sleep(10)\nprint(json.dumps({'results':[],'error':'timeout'} if 'SELHANI' in q else {'results':[{'title':'Fixture','url':'https://fixture.invalid','snippet':'ověřený výsledek'}]}))\n");
 let replies=[],calls=[],closed=0;
@@ -22,7 +22,7 @@ const mock=http.createServer(async(req,res)=>{
  res.end('data: '+JSON.stringify({choices:[{delta:{content:item.text},finish_reason:item.finish||'stop'}]})+'\n\ndata: [DONE]\n\n');
 });
 await new Promise(r=>mock.listen(0,'127.0.0.1',r));
-await fs.writeFile(path.join(temp,'config.json'),JSON.stringify({port:8796,host:'127.0.0.1',llm:{url:'http://127.0.0.1:'+mock.address().port,temperature:.7,top_p:.95,presence_penalty:.4,max_tokens:320,history_limit:20,thinking:'off'},search:{python},tts:{url:'http://127.0.0.1:1',emotions:{}}}));
+await fs.writeFile(path.join(temp,'config.json'),JSON.stringify({port:8796,host:'127.0.0.1',llm:{url:'http://127.0.0.1:'+mock.address().port,temperature:.7,top_p:.95,presence_penalty:.4,max_tokens:320,history_limit:20,thinking:'off'},diagnostics:{enabled:true,retention_days:7},search:{python},tts:{url:'http://127.0.0.1:1',emotions:{}}}));
 const child=spawn(process.execPath,[path.join(temp,'server.js')],{windowsHide:true,stdio:['ignore','pipe','pipe']});let logs='';
 child.stdout.on('data',c=>logs+=c);child.stderr.on('data',c=>logs+=c);
 const until=async fn=>{const end=Date.now()+6000;while(!fn()&&Date.now()<end)await sleep(30);assert.ok(fn(),logs)};
@@ -141,6 +141,24 @@ try{
   assert.equal(calls.at(-1).messages.at(-1).content.includes('Tato volba trvá'),item.normal);
  }
 
+ const key=(await fs.readFile(path.join(temp,'diagnostics.key'),'utf8')).trim();
+ const logsUrl='http://127.0.0.1:8796/api/diagnostics/logs';
+ assert.equal((await fetch(logsUrl)).status,401);
+ assert.equal((await fetch(logsUrl+'?token='+key)).status,401);
+ assert.equal((await fetch(logsUrl,{headers:{Authorization:'Bearer '+ 'x'.repeat(64)}})).status,401);
+ let journal=await(await fetch(logsUrl+'?limit=500',{headers:{Authorization:'Bearer '+key}})).json();
+ assert.ok(journal.records.some(x=>x.event==='input'&&x.text.includes('SENSITIVE_MESSAGE')));
+ assert.ok(journal.records.some(x=>x.event==='search_query'));
+ assert.ok(journal.records.some(x=>x.event==='output'&&x.text.includes('výsledek')));
+ assert.ok(!JSON.stringify(journal).includes('base64'));
+ const receipt=events.find(e=>e.diagnostics)?.diagnostics;assert.ok(receipt);
+ result=await api('/api/diagnostics/events',{receipt,event:'playback_start',segment:1,text:'Testovací věta.',emotion:'sad',mood:'gloomy',serious:true,audio:true});assert.equal(result.status,200);
+ result=await api('/api/diagnostics/events',{receipt:{...receipt,token:'f'.repeat(64)},event:'interrupted'});assert.equal(result.status,403);assert.equal(result.data.accepted,false);
+ journal=await(await fetch(logsUrl+'?requestId='+receipt.requestId,{headers:{Authorization:'Bearer '+key}})).json();
+ assert.ok(journal.records.some(x=>x.event==='playback_start'&&x.serious));
+ assert.ok(journal.records.every(x=>x.requestId===receipt.requestId));
+ for(const route of ['/diagnostics.key','/var/diagnostics/'])assert.equal((await fetch('http://127.0.0.1:8796'+route)).status,404);
+ assert.ok(!logs.includes(key));
  assert.ok(!logs.includes('SENSITIVE_MESSAGE'));assert.ok(logs.includes('search_start')&&logs.includes('search_end')&&logs.includes('research_repair')&&logs.includes('chat_done'));
  console.log('PASS: explicit search once; denied unsolicited/model/history/client-state search; bounded non-search recovery; silent discarded preamble; natural final; no memory mutation; stable shift; bounded repair; truncation/count checks; honest search failure; no false done; cancellation; private logs.');
 }finally{child.kill();mock.closeAllConnections();await new Promise(r=>mock.close(r));}
