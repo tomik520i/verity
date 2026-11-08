@@ -474,3 +474,11 @@ public/horror-director.mjs přidává k výrazu šest reakcí: mask, stare, tilt
 Research prompt už neomezuje výstup na happy/curious. Sanitizace zachovává povolené emoce a nálady mezi položkami, odstraňuje ostatní instrukční značky a vynucuje posun 0. Public/delivery-policy.mjs vyhodnocuje aktuální mluvený segment; závažný obsah dostává serious=true a renderer okamžitě potlačí úsměv, komické prvky, idle a horor. Neutrální věcný výraz nemá automatický úsměv. Fotky používají stejnou cestu; každá má vlastní herecké značky. [Podrobnosti a omezení](docs/EMOCE-PODLE-OBSAHU.md).
 
 Zapnutá diagnostika přidává chráněný GET /api/diagnostics/logs a podpisem omezený POST /api/diagnostics/events. Klient dostává v SSE krátkodobý podpis konkrétního tahu, nikoli správcovský čtecí klíč. Úložiště mimo public/Git uchovává text, serverové události a potvrzení přehrávání. Neuchovává obrázky, WAV ani reasoning. [Přesný provozní postup](docs/DIAGNOSTIKA.md). Předchozí popis čistě lokální historie se vztahuje k paměti a přepisu v prohlížeči; diagnostika je samostatná serverová kopie nových textových tahů.
+
+## Nezhasínání viditelné stránky
+
+public/screen-awake.mjs žádá Screen Wake Lock ihned po načtení viditelné stránky. Nepodmiňuje ho awake, mikrofonem, hovorem, přehráváním ani původní uloženou volbou keepAwake. Při visibilitychange do hidden a pagehide jej uvolní; návrat a pageshow (včetně BFCache) požádají znovu. Čekající žádosti se nesouběží, opožděné zámky skryté stránky se uvolní a starý release callback nemůže zrušit nový zámek.
+
+Po odmítnutí nebo systémovém uvolnění se automaticky neopakuje nekonečná smyčka. Další klepnutí, klávesa nebo návrat do stránky zkusí žádost znovu. Stav je uveden v nastavení. Funkce neumí obejít ruční zamknutí telefonu, rozhodnutí systému při nízké baterii ani udržet skrytou aplikaci v popředí. Nepoužívá skryté video nebo tichý zvuk.
+
+[Dokumentace Screen Wake Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API). tests/screen-awake-test.mjs ověřuje životní cyklus, souběh, odmítnutí a návrat ze skrytí; nesimuluje fyzické zhasnutí konkrétního telefonu.

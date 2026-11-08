@@ -1,3 +1,4 @@
+import {createScreenAwake,screenAwakeLabel} from './screen-awake.mjs?v=20261108-13';
 import {conversationId,DiagnosticTrace} from './diagnostics-client.mjs?v=20261108-12';
 import { CaptionState } from './captions.mjs?v=20261108-5';
 import { roleplayPreference } from './conversation-mode.mjs?v=20261108-2';
@@ -920,23 +921,8 @@ setInterval(() => {
 }, 1000);
 
 let titleTimer = null;
-// ── nezhasínat displej (Screen Wake Lock API) ────────────────────────────────
-// Prohlížeč zámek sám uvolní, když stránka zmizí z obrazovky (jiná záložka/aplikace);
-// po návratu se znovu požádá. Bez podpory (starší prohlížeč) se volba skryje.
-let wakeLock = null, keepAwake = store.get('keepAwake', true);
-const wakeLockSupported = 'wakeLock' in navigator;
-async function lockScreen() {
-  if (!keepAwake || !wakeLockSupported || !awake || document.hidden || wakeLock) return;
-  try {
-    wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => { wakeLock = null; });
-  } catch (e) { console.warn('wake lock:', e.message); }   // např. úsporný režim baterie
-}
-function unlockScreen() { wakeLock?.release().catch(() => {}); wakeLock = null; }
-$('opt-awake').closest('label').hidden = !wakeLockSupported;
-$('opt-awake').checked = keepAwake;
-$('opt-awake').onchange = e => { keepAwake = e.target.checked; store.set('keepAwake', keepAwake); keepAwake ? lockScreen() : unlockScreen(); };
-document.addEventListener('visibilitychange', () => { if (!document.hidden) lockScreen(); });
+// Displej držíme pro celou viditelnou stránku, i před probuzením a bez mikrofonu.
+const screenAwake=createScreenAwake({onState:state=>{ $('screen-awake-status').textContent=screenAwakeLabel(state); }});
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
@@ -1153,8 +1139,6 @@ async function wake({ voice = true } = {}) {
   if (awake) return;
   await initAudio();
   if (store.get('music', false)) toggleMusic(true);   // podkres hrál i minule → pokračovat
-  awake = true;
-  lockScreen();                                        // nezhasínat displej, dokud je Verity vidět
   awake = true;
   visits++; store.set('visits', visits);
   $('wake').classList.add('gone');

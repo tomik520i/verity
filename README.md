@@ -18,6 +18,7 @@ LLM, přepis i hlas běží na vlastním hardwaru. Hledání na internetu použ�
 - **Místní test citlivosti** – otevření nastavení zapne mikrofon jen pro měřák dBFS, pravděpodobnosti řeči a živý práh. Žádný zvuk z testu nejde do Whisperu či Verity; zavřením se mikrofon uvolní.
 - **Automatický diagnostický log** – správce může načíst nové rozhovory, emoce, hledání a přehrávání přes chráněný endpoint bez ručního exportu. Retence sedm dní, bez souborů audia a obrázků. [Přístup a provoz](docs/DIAGNOSTIKA.md).
 - **Emoce podle obsahu** – výsledky hledání a fotky dostávají vlastní výraz; tragické zprávy mají střídmé podání bez úsměvu. [Popis a ověření](docs/EMOCE-PODLE-OBSAHU.md).
+- **Rozsvícená obrazovka** – Verity automaticky brání zhasnutí po celou dobu, kdy je její stránka viditelná, i bez hovoru a před úvodním tlačítkem. Při skrytí se zámek uvolní; po návratu se obnoví. Závisí na podpoře prohlížeče a rozhodnutí systému.
 - **Stav práce** – poslouchání, přepis, přemýšlení, hledání, mluvení, dokončení a chyba.
 
 - **Anime výrazy a gesta** – 29 emocí včetně komického uražení, sedm pomalejších nálad, hvězdičkové/srdíčkové oči, kapičky, ruměnec, úleky a pružné pohyby. Gesta začínají s přehrávanou větou. [Úplný seznam emocí](docs/EMOCE.md).
